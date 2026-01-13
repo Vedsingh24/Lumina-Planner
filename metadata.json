@@ -1,0 +1,8 @@
+{
+  "name": "Lumina Planner AI",
+  "description": "An AI-enhanced personal productivity hub that transforms rough notes into structured tasks.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
