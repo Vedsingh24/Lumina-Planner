@@ -55,7 +55,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state]);
+  }, []);
 
   useEffect(() => {
     storageService.saveState(state);
