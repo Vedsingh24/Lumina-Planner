@@ -14,17 +14,24 @@ const App: React.FC = () => {
   const [isEditingMission, setIsEditingMission] = useState(false);
   const [tempMission, setTempMission] = useState('');
 
-  const handleExit = () => {
-    // Save state before exiting
-    storageService.saveState(state);
+  const handleExit = async () => {
+    console.log('Exit triggered, saving state...');
+    try {
+      await storageService.saveState(state);
+      console.log('State saved successfully');
+    } catch (e) {
+      console.error('Failed to save state before exit:', e);
+    }
     
-    // Check if running in Electron
-    if (typeof window !== 'undefined' && (window as any).require) {
-      const { ipcRenderer } = (window as any).require('electron');
-      ipcRenderer.send('quit-app');
-    } else {
-      // In browser, just show an alert
-      alert('Application will be closed');
+    // Send quit signal to Electron
+    try {
+      const electron = (window as any).require?.('electron');
+      if (electron?.ipcRenderer) {
+        console.log('Sending quit signal to Electron');
+        electron.ipcRenderer.send('quit-app');
+      }
+    } catch (e) {
+      console.error('Electron not available:', e);
     }
   };
 
@@ -58,7 +65,10 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    storageService.saveState(state);
+    // Fire and forget - save state asynchronously on changes
+    storageService.saveState(state).catch((e) => {
+      console.error('Error saving state:', e);
+    });
   }, [state]);
 
   const handleTasksGenerated = useCallback((newTasksData: any[]) => {
