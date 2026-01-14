@@ -23,25 +23,34 @@ function getIpcRenderer(): any | null {
 }
 
 export const storageService = {
-  // Load state: use Electron IPC if available, else localStorage
+  // Load state: merges all historical data from all dates
   loadState: (): PlannerState => {
     const ipc = getIpcRenderer();
+    console.log('📂 loadState called, IPC available:', !!ipc);
     
     // Try IPC first
     if (ipc) {
       try {
-        // Use sendSync for immediate load on startup
-        const res = (ipc as any).sendSync?.('storage-load-sync');
-        if (res) {
-          console.log('Loaded state from Electron storage:', res);
+        console.log('  Calling sendSync(storage-load-sync)...');
+        const res = (ipc as any).sendSync('storage-load-sync');
+        console.log('  Raw result from IPC:', res);
+        
+        if (res && Array.isArray(res.tasks)) {
+          console.log('  ✓ Loaded', res.tasks.length, 'total tasks from all dates');
           return res as PlannerState;
+        } else if (res) {
+          console.log('  ✓ Loaded state:', res);
+          return res as PlannerState;
+        } else {
+          console.log('  ✗ IPC returned null, falling back to localStorage');
         }
       } catch (e) {
-        console.error('IPC sendSync failed:', e);
+        console.error('  ✗ IPC sendSync failed:', e);
       }
     }
 
     // Fallback to localStorage
+    console.log('  Using localStorage fallback');
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -58,23 +67,25 @@ export const storageService = {
     };
   },
 
-  // Save state: use Electron IPC if available, else localStorage
+  // Save state: appends/updates today's entry and prunes old data
   saveState: async (state: PlannerState): Promise<void> => {
     const ipc = getIpcRenderer();
+    console.log('💾 saveState called, IPC available:', !!ipc);
+    console.log('  Tasks to save:', state.tasks?.length || 0);
     
     if (ipc) {
       try {
-        console.log('Saving state via IPC:', state);
+        console.log('  Calling invoke(storage-save)...');
         const result = await (ipc as any).invoke('storage-save', state);
-        console.log('Save result:', result);
+        console.log('  Save result:', result);
         return;
       } catch (e) {
-        console.error('IPC save failed, falling back to localStorage:', e);
+        console.error('  ✗ IPC save failed:', e);
       }
     }
     
     // Fallback to localStorage
-    console.log('Using localStorage fallback');
+    console.log('  Using localStorage fallback');
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   },
 

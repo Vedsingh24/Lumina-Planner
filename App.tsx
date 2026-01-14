@@ -1,101 +1,130 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { storageService } from './services/storageService.ts';
-import { geminiService } from './services/geminiService.ts';
-import { Task, PlannerState } from './types.ts';
-import ChatInterface from './components/ChatInterface.tsx';
-import TaskCard from './components/TaskCard.tsx';
-import AnalyticsDashboard from './components/AnalyticsDashboard.tsx';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { storageService } from './services/storageService';
+import { geminiService } from './services/geminiService';
+import { Task, PlannerState } from './types';
+import ChatInterface from './components/ChatInterface';
+import TaskCard from './components/TaskCard';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 
 const App: React.FC = () => {
-  const [state, setState] = useState<PlannerState>({ tasks: [], userName: 'User', dailyMission: '' });
+  const [state, setState] = useState<PlannerState>({
+    tasks: [],
+    userName: 'User',
+    dailyMission: ''
+  });
+
   const [activeTab, setActiveTab] = useState<'board' | 'analytics'>('board');
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
   const [isEditingMission, setIsEditingMission] = useState(false);
   const [tempMission, setTempMission] = useState('');
 
+  /** 🔒 Prevents saving during initial hydration */
+  const hasHydratedRef = useRef(false);
+
+  /* =========================
+     App Exit (Ctrl+Q / Button)
+     ========================= */
   const handleExit = async () => {
-    console.log('Exit triggered, saving state...');
     try {
       await storageService.saveState(state);
-      console.log('State saved successfully');
     } catch (e) {
-      console.error('Failed to save state before exit:', e);
+      console.error('Failed to save before exit:', e);
     }
-    
-    // Send quit signal to Electron
+
     try {
       const electron = (window as any).require?.('electron');
-      if (electron?.ipcRenderer) {
-        console.log('Sending quit signal to Electron');
-        electron.ipcRenderer.send('quit-app');
-      }
-    } catch (e) {
-      console.error('Electron not available:', e);
+      electron?.ipcRenderer?.send('quit-app');
+    } catch {
+      // ignore if not in Electron
     }
   };
 
+  /* =========================
+     Initial Load (Hydration)
+     ========================= */
   useEffect(() => {
     const saved = storageService.loadState();
     setState(saved);
-    
-    // Only fetch inspiration if there isn't one saved for today
-    // (Simple check: if mission is empty, fetch it)
+
+    // ✅ Mark hydration complete immediately
+    hasHydratedRef.current = true;
+
+    // Fetch Gemini inspiration only if none exists
     if (!saved.dailyMission) {
-      const fetchPrompt = async () => {
+      (async () => {
         try {
           const prompt = await geminiService.getDailyInspiration();
-          setState(prev => ({ ...prev, dailyMission: prompt?.replace(/"/g, '') || "Make today count." }));
-        } catch (e) {
-          setState(prev => ({ ...prev, dailyMission: "Seize the day." }));
+          setState(prev => ({
+            ...prev,
+            dailyMission: prompt?.replace(/"/g, '') || 'Make today count.'
+          }));
+        } catch {
+          setState(prev => ({ ...prev, dailyMission: 'Seize the day.' }));
         }
-      };
-      fetchPrompt();
+      })();
     }
 
-    // Add keyboard shortcut for exit (Ctrl+Q)
+    // Ctrl+Q handler
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
         e.preventDefault();
         handleExit();
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  /* =========================
+     Persistence (SAFE)
+     ========================= */
   useEffect(() => {
-    // Fire and forget - save state asynchronously on changes
-    storageService.saveState(state).catch((e) => {
-      console.error('Error saving state:', e);
-    });
+    if (!hasHydratedRef.current) return; // ⛔ no startup overwrite
+
+    storageService.saveState(state).catch(err =>
+      console.error('Auto-save failed:', err)
+    );
   }, [state]);
 
-  const handleTasksGenerated = useCallback((newTasksData: any[]) => {
-    const tasksToAdd: Task[] = newTasksData.map(data => ({
-      id: Math.random().toString(36).substr(2, 9),
-      title: data.title,
-      description: data.description || 'No description provided.',
-      category: data.category || 'General',
-      priority: data.priority || 'medium',
-      completed: false,
-      rating: null,
-      createdAt: new Date().toISOString(),
-      date: selectedDate
-    }));
+  /* =========================
+     Task Handlers
+     ========================= */
+  const handleTasksGenerated = useCallback(
+    (newTasksData: any[]) => {
+      const tasksToAdd: Task[] = newTasksData.map(data => ({
+        id: crypto.randomUUID(),
+        title: data.title,
+        description: data.description || 'No description provided.',
+        category: data.category || 'General',
+        priority: data.priority || 'medium',
+        completed: false,
+        rating: null,
+        createdAt: new Date().toISOString(),
+        date: selectedDate
+      }));
 
-    setState(prev => ({
-      ...prev,
-      tasks: [...tasksToAdd, ...prev.tasks]
-    }));
-  }, [selectedDate]);
+      setState(prev => ({
+        ...prev,
+        tasks: [...tasksToAdd, ...prev.tasks]
+      }));
+    },
+    [selectedDate]
+  );
 
   const toggleTask = (id: string) => {
     setState(prev => ({
       ...prev,
-      tasks: prev.tasks.map(t => 
-        t.id === id 
-          ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined } 
+      tasks: prev.tasks.map(t =>
+        t.id === id
+          ? {
+              ...t,
+              completed: !t.completed,
+              completedAt: !t.completed ? new Date().toISOString() : undefined
+            }
           : t
       )
     }));
@@ -104,7 +133,9 @@ const App: React.FC = () => {
   const rateTask = (id: string, rating: number) => {
     setState(prev => ({
       ...prev,
-      tasks: prev.tasks.map(t => t.id === id ? { ...t, rating } : t)
+      tasks: prev.tasks.map(t =>
+        t.id === id ? { ...t, rating } : t
+      )
     }));
   };
 
@@ -115,12 +146,9 @@ const App: React.FC = () => {
     }));
   };
 
-  const navigateDate = (days: number) => {
-    const current = new Date(selectedDate);
-    current.setDate(current.getDate() + days);
-    setSelectedDate(current.toISOString().split('T')[0]);
-  };
-
+  /* =========================
+     Mission Editing
+     ========================= */
   const startEditingMission = () => {
     setTempMission(state.dailyMission || '');
     setIsEditingMission(true);
@@ -131,22 +159,24 @@ const App: React.FC = () => {
     setIsEditingMission(false);
   };
 
+  /* =========================
+     Date & Filtering
+     ========================= */
+  const navigateDate = (days: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
   const filteredTasks = state.tasks.filter(t => {
-    const matchesDate = t.date === selectedDate;
-    if (!matchesDate) return false;
+    if (t.date !== selectedDate) return false;
     if (filter === 'pending') return !t.completed;
     if (filter === 'completed') return t.completed;
     return true;
   });
 
-  const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-
-  const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const isToday =
+    selectedDate === new Date().toISOString().split('T')[0];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
