@@ -89,8 +89,19 @@ const App: React.FC = () => {
   /* =========================
      Persistence (SAFE)
      ========================= */
+  /* =========================
+     Persistence (SAFE)
+     ========================= */
+  const isFirstRun = useRef(true);
+
   useEffect(() => {
     if (!hasHydratedRef.current) return; // ⛔ no startup overwrite
+
+    // Skip the immediate save after hydration (prevent overwriting if load failed uniquely)
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
 
     storageService.saveState(state).catch(err =>
       console.error('Auto-save failed:', err)

@@ -97,10 +97,41 @@ app.whenReady().then(() => {
     return await readDataFile();
   });
 
+  function readDataFileSync() {
+    try {
+      if (!fsSync.existsSync(DATA_FILE)) {
+        console.log('✗ No existing data file found at (sync):', DATA_FILE);
+        return { tasks: [], userName: 'User', dailyMission: '', chatHistory: {} };
+      }
+      const raw = fsSync.readFileSync(DATA_FILE, 'utf8');
+      console.log('✓ Data file read successfully (sync) from:', DATA_FILE);
+      const data = JSON.parse(raw);
+
+      if (Array.isArray(data)) {
+        console.log('  Mapping old array format to new state object');
+        const mergedState = {
+          tasks: [],
+          userName: 'User',
+          dailyMission: '',
+          chatHistory: {}
+        };
+        for (const entry of data) {
+          if (!mergedState.dailyMission && entry.dailyMission) mergedState.dailyMission = entry.dailyMission;
+          if (entry.tasks) mergedState.tasks.push(...entry.tasks);
+        }
+        return mergedState;
+      }
+      return data;
+    } catch (e) {
+      console.log('✗ Failed to read data file (sync):', e);
+      return { tasks: [], userName: 'User', dailyMission: '', chatHistory: {} };
+    }
+  }
+
   // Synchronous load for initial startup
-  ipcMain.on('storage-load-sync', async (event) => {
+  ipcMain.on('storage-load-sync', (event) => {
     console.log('📂 IPC: storage-load-sync called');
-    const data = await readDataFile();
+    const data = readDataFileSync();
     event.returnValue = data;
   });
 
