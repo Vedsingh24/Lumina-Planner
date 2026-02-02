@@ -2,7 +2,7 @@
   "name": "lumina-planner",
   "version": "1.0.0",
   "description": "Personal AI Productivity Planner",
-  "main": "electron-main.js",
+  "main": "electron.cjs",
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",

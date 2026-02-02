@@ -178,6 +178,13 @@ const App: React.FC = () => {
   const isToday =
     selectedDate === new Date().toISOString().split('T')[0];
 
+  const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+});  
+
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
