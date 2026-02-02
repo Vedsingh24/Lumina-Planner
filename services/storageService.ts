@@ -27,22 +27,21 @@ export const storageService = {
   loadState: (): PlannerState => {
     const ipc = getIpcRenderer();
     console.log('📂 loadState called, IPC available:', !!ipc);
-    
+
     // Try IPC first
     if (ipc) {
       try {
         console.log('  Calling sendSync(storage-load-sync)...');
         const res = (ipc as any).sendSync('storage-load-sync');
         console.log('  Raw result from IPC:', res);
-        
-        if (res && Array.isArray(res.tasks)) {
-          console.log('  ✓ Loaded', res.tasks.length, 'total tasks from all dates');
-          return res as PlannerState;
-        } else if (res) {
-          console.log('  ✓ Loaded state:', res);
-          return res as PlannerState;
-        } else {
-          console.log('  ✗ IPC returned null, falling back to localStorage');
+
+        if (res) {
+          return {
+            tasks: res.tasks || [],
+            userName: res.userName || 'User',
+            dailyMission: res.dailyMission || '',
+            chatHistory: res.chatHistory || {}
+          };
         }
       } catch (e) {
         console.error('  ✗ IPC sendSync failed:', e);
@@ -57,13 +56,15 @@ export const storageService = {
       return {
         tasks: parsed.tasks || [],
         userName: parsed.userName || 'User',
-        dailyMission: parsed.dailyMission || ''
+        dailyMission: parsed.dailyMission || '',
+        chatHistory: parsed.chatHistory || {}
       };
     }
     return {
       tasks: [],
       userName: 'User',
-      dailyMission: ''
+      dailyMission: '',
+      chatHistory: {}
     };
   },
 
@@ -72,7 +73,7 @@ export const storageService = {
     const ipc = getIpcRenderer();
     console.log('💾 saveState called, IPC available:', !!ipc);
     console.log('  Tasks to save:', state.tasks?.length || 0);
-    
+
     if (ipc) {
       try {
         console.log('  Calling invoke(storage-save)...');
@@ -83,7 +84,7 @@ export const storageService = {
         console.error('  ✗ IPC save failed:', e);
       }
     }
-    
+
     // Fallback to localStorage
     console.log('  Using localStorage fallback');
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));

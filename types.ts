@@ -17,6 +17,7 @@ export interface PlannerState {
   tasks: Task[];
   userName: string;
   dailyMission?: string;
+  chatHistory: Record<string, ChatMessage[]>;
 }
 
 export interface ChatMessage {

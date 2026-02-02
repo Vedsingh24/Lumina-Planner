@@ -6,14 +6,19 @@ import { storageService } from '../services/storageService.ts';
 interface ChatInterfaceProps {
   onTasksGenerated: (newTasks: any[]) => void;
   existingTasks: Task[];
+  messages: ChatMessage[];
+  onSendMessage: (content: string) => Promise<void>;
+  isLoading: boolean;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onTasksGenerated, existingTasks }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: "Hi! I'm Lumina. Drop your rough agenda here, and I'll turn it into an organized checklist for you.", timestamp: new Date().toISOString() }
-  ]);
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  onTasksGenerated,
+  existingTasks,
+  messages,
+  onSendMessage,
+  isLoading
+}) => {
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,47 +29,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onTasksGenerated, existin
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-
-    const userMsg: ChatMessage = { role: 'user', content: input, timestamp: new Date().toISOString() };
-    setMessages(prev => [...prev, userMsg]);
+    const content = input;
     setInput('');
-    setIsLoading(true);
-
-    try {
-      const lowercaseInput = input.toLowerCase();
-      const isAgendaRequest = lowercaseInput.includes('agenda') || 
-                             lowercaseInput.includes('tasks') || 
-                             lowercaseInput.includes('plan') ||
-                             input.length > 50;
-
-      if (isAgendaRequest) {
-        const newTasksData = await geminiService.processAgenda(input);
-        if (newTasksData && newTasksData.length > 0) {
-          onTasksGenerated(newTasksData);
-          const assistantMsg: ChatMessage = { 
-            role: 'assistant', 
-            content: `I've analyzed your notes and generated ${newTasksData.length} new tasks for you! Check them out in your task board.`, 
-            timestamp: new Date().toISOString() 
-          };
-          setMessages(prev => [...prev, assistantMsg]);
-        } else {
-          throw new Error("No tasks extracted");
-        }
-      } else {
-        const reply = await geminiService.getChatResponse(input, existingTasks);
-        const assistantMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: new Date().toISOString() };
-        setMessages(prev => [...prev, assistantMsg]);
-      }
-    } catch (error) {
-      const errorMsg: ChatMessage = { 
-        role: 'assistant', 
-        content: "I'm sorry, I had trouble processing that. Could you try rephrasing your agenda?", 
-        timestamp: new Date().toISOString() 
-      };
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsLoading(false);
-    }
+    await onSendMessage(content);
   };
 
   return (
@@ -73,15 +40,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onTasksGenerated, existin
         <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
         <h3 className="font-semibold text-blue-100">Lumina AI Assistant</h3>
       </div>
-      
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-              m.role === 'user' 
-                ? 'bg-blue-600 text-white rounded-tr-none' 
-                : 'bg-slate-700 text-slate-100 rounded-tl-none border border-slate-600'
-            }`}>
+            <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${m.role === 'user'
+              ? 'bg-blue-600 text-white rounded-tr-none'
+              : 'bg-slate-700 text-slate-100 rounded-tl-none border border-slate-600'
+              }`}>
               {m.content}
             </div>
           </div>
@@ -102,12 +68,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onTasksGenerated, existin
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             placeholder="Paste your rough agenda or chat..."
             className="w-full bg-slate-800 text-slate-100 text-sm rounded-xl py-3 pl-4 pr-12 border border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
             rows={2}
           />
-          <button 
+          <button
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
             className="absolute right-3 bottom-3 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:opacity-50 text-white rounded-lg transition-colors"

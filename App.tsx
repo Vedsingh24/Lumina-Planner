@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Reorder } from 'framer-motion';
 import { storageService } from './services/storageService';
 import { geminiService } from './services/geminiService';
-import { Task, PlannerState } from './types';
+import { Task, PlannerState, ChatMessage } from './types';
 import ChatInterface from './components/ChatInterface';
 import TaskCard from './components/TaskCard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import CalendarPicker from './components/CalendarPicker';
 
 const App: React.FC = () => {
   const [state, setState] = useState<PlannerState>({
     tasks: [],
     userName: 'User',
-    dailyMission: ''
+    dailyMission: '',
+    chatHistory: {}
   });
+
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'board' | 'analytics'>('board');
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
@@ -23,6 +28,8 @@ const App: React.FC = () => {
 
   /** 🔒 Prevents saving during initial hydration */
   const hasHydratedRef = useRef(false);
+
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   /* =========================
      App Exit (Ctrl+Q / Button)
@@ -121,10 +128,10 @@ const App: React.FC = () => {
       tasks: prev.tasks.map(t =>
         t.id === id
           ? {
-              ...t,
-              completed: !t.completed,
-              completedAt: !t.completed ? new Date().toISOString() : undefined
-            }
+            ...t,
+            completed: !t.completed,
+            completedAt: !t.completed ? new Date().toISOString() : undefined
+          }
           : t
       )
     }));
@@ -137,6 +144,38 @@ const App: React.FC = () => {
         t.id === id ? { ...t, rating } : t
       )
     }));
+  };
+
+  /* =========================
+     Reorder Logic
+     ========================= */
+  const handleReorder = (newOrder: Task[]) => {
+    setState(prev => {
+      // 1. Separate tasks
+      const otherDateTasks = prev.tasks.filter(t => t.date !== selectedDate);
+      const currentDateTasks = prev.tasks.filter(t => t.date === selectedDate);
+
+      // 2. Identify indices of items in `newOrder` within `currentDateTasks`
+      // (We only move items that are currently visible/filtered)
+      const originalIndices = new Map<string, number>();
+      currentDateTasks.forEach((t, i) => originalIndices.set(t.id, i));
+
+      // 3. Get the stable slots/indices that these items occupied
+      // We process only items that exist in both lists (sanity check)
+      const validItems = newOrder.filter(t => originalIndices.has(t.id));
+      const slots = validItems.map(t => originalIndices.get(t.id)!).sort((a, b) => a - b);
+
+      // 4. Fill those slots with the items in their new relative order
+      const newCurrentDateTasks = [...currentDateTasks];
+      slots.forEach((slot, i) => {
+        newCurrentDateTasks[slot] = validItems[i];
+      });
+
+      return {
+        ...prev,
+        tasks: [...otherDateTasks, ...newCurrentDateTasks]
+      };
+    });
   };
 
   const deleteTask = (id: string) => {
@@ -179,11 +218,102 @@ const App: React.FC = () => {
     selectedDate === new Date().toISOString().split('T')[0];
 
   const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
-  weekday: 'long',
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric'
-});  
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  /* =========================
+     Chat Logic
+     ========================= */
+  const handleSendMessage = async (content: string) => {
+    setIsChatLoading(true);
+    const today = new Date().toISOString();
+
+    // 1. Construct User Message
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content,
+      timestamp: today
+    };
+
+    // 2. Optimistic Update (preserve welcome msg if starting new)
+    setState(prev => {
+      const currentHistory = prev.chatHistory[selectedDate] || [];
+      // If history is empty, assume we want to keep the "Hi" message that was shown
+      const historyToUse = currentHistory.length === 0
+        ? [{ role: 'assistant' as const, content: "Hi! I'm Lumina. Drop your rough agenda here, and I'll turn it into an organized checklist for you.", timestamp: today }]
+        : currentHistory;
+
+      return {
+        ...prev,
+        chatHistory: {
+          ...prev.chatHistory,
+          [selectedDate]: [...historyToUse, userMsg]
+        }
+      };
+    });
+
+    try {
+      const lowercaseInput = content.toLowerCase();
+      const isAgendaRequest = lowercaseInput.includes('agenda') ||
+        lowercaseInput.includes('tasks') ||
+        lowercaseInput.includes('plan') ||
+        content.length > 50;
+
+      let replyContent = '';
+
+      if (isAgendaRequest) {
+        const newTasksData = await geminiService.processAgenda(content);
+        if (newTasksData && newTasksData.length > 0) {
+          handleTasksGenerated(newTasksData);
+          replyContent = `I've analyzed your notes and generated ${newTasksData.length} new tasks for you! Check them out in your task board.`;
+        } else {
+          throw new Error("No tasks extracted");
+        }
+      } else {
+        replyContent = await geminiService.getChatResponse(content, state.tasks); // Pass all tasks for context
+      }
+
+      // 3. Add Assistant Response
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: replyContent,
+        timestamp: new Date().toISOString()
+      };
+
+      setState(prev => ({
+        ...prev,
+        chatHistory: {
+          ...prev.chatHistory,
+          [selectedDate]: [...(prev.chatHistory[selectedDate] || []), assistantMsg]
+        }
+      }));
+
+    } catch (error) {
+      const errorMsg: ChatMessage = {
+        role: 'assistant',
+        content: "I'm sorry, I had trouble processing that. Could you try rephrasing your agenda?",
+        timestamp: new Date().toISOString()
+      };
+
+      setState(prev => ({
+        ...prev,
+        chatHistory: {
+          ...prev.chatHistory,
+          [selectedDate]: [...(prev.chatHistory[selectedDate] || []), errorMsg]
+        }
+      }));
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  // Safe accessor for chat history
+  const currentChatMessages = state.chatHistory?.[selectedDate]?.length
+    ? state.chatHistory[selectedDate]
+    : [{ role: 'assistant' as const, content: "Hi! I'm Lumina. Drop your rough agenda here, and I'll turn it into an organized checklist for you.", timestamp: new Date().toISOString() }];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
@@ -205,25 +335,34 @@ const App: React.FC = () => {
               <p className="text-[10px] text-blue-400 font-bold tracking-widest uppercase">Personal Focus Hub</p>
             </div>
           </div>
-          
+
           <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/5 gap-1">
-            <button 
+            <button
               onClick={() => setActiveTab('board')}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                activeTab === 'board' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'board' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'
+                }`}
             >
               My Board
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('analytics')}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                activeTab === 'analytics' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'analytics' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'
+                }`}
             >
               Insights
             </button>
-            <button 
+            <button
+              onClick={() => {
+                try {
+                  (window as any).require?.('electron')?.ipcRenderer?.send('minimize-app');
+                } catch { }
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-300"
+              title="Minimize"
+            >
+              _
+            </button>
+            <button
               onClick={handleExit}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300"
               title="Exit application (Ctrl+Q)"
@@ -243,13 +382,13 @@ const App: React.FC = () => {
                 <div className="relative p-8 border border-white/5 glass-panel">
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-blue-500/20 rounded-2xl text-blue-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 opacity-80">Daily Mission</span>
                         {!isEditingMission && (
-                          <button 
+                          <button
                             onClick={startEditingMission}
                             className="text-[10px] text-slate-500 hover:text-blue-400 uppercase tracking-widest font-bold transition-colors"
                           >
@@ -257,7 +396,7 @@ const App: React.FC = () => {
                           </button>
                         )}
                       </div>
-                      
+
                       {isEditingMission ? (
                         <div className="flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
                           <textarea
@@ -274,13 +413,13 @@ const App: React.FC = () => {
                             rows={2}
                           />
                           <div className="flex justify-end gap-2">
-                            <button 
+                            <button
                               onClick={() => setIsEditingMission(false)}
                               className="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors"
                             >
                               Cancel
                             </button>
-                            <button 
+                            <button
                               onClick={saveMission}
                               className="px-4 py-1.5 bg-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-colors"
                             >
@@ -289,7 +428,7 @@ const App: React.FC = () => {
                           </div>
                         </div>
                       ) : (
-                        <h2 
+                        <h2
                           onClick={startEditingMission}
                           className="text-xl md:text-2xl font-semibold text-white/90 italic tracking-tight leading-relaxed cursor-pointer hover:text-white transition-colors group-hover:translate-x-1 transition-transform"
                         >
@@ -307,23 +446,38 @@ const App: React.FC = () => {
                     <button onClick={() => navigateDate(-1)} className="p-2 hover:bg-slate-800 rounded-lg transition-all text-slate-400 hover:text-blue-400">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     </button>
-                    <span className="text-sm font-bold px-4 text-slate-200 min-w-[150px] text-center">
-                      {isToday ? "Today, " + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : formattedDate}
-                    </span>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                        className="text-sm font-bold px-4 text-slate-200 min-w-[150px] text-center hover:text-blue-400 transition-colors"
+                      >
+                        {isToday ? "Today, " + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : formattedDate}
+                      </button>
+                      {isCalendarOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsCalendarOpen(false)}></div>
+                          <CalendarPicker
+                            selectedDate={selectedDate}
+                            onSelectDate={setSelectedDate}
+                            tasks={state.tasks}
+                            onClose={() => setIsCalendarOpen(false)}
+                          />
+                        </>
+                      )}
+                    </div>
                     <button onClick={() => navigateDate(1)} className="p-2 hover:bg-slate-800 rounded-lg transition-all text-slate-400 hover:text-blue-400">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-1 bg-slate-900/50 p-1 rounded-xl border border-white/5">
                   {(['all', 'pending', 'completed'] as const).map((f) => (
                     <button
                       key={f}
                       onClick={() => setFilter(f)}
-                      className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
-                        filter === f ? 'bg-blue-600/20 text-blue-400' : 'text-slate-500 hover:text-slate-300'
-                      }`}
+                      className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${filter === f ? 'bg-blue-600/20 text-blue-400' : 'text-slate-500 hover:text-slate-300'
+                        }`}
                     >
                       {f}
                     </button>
@@ -331,16 +485,26 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-5">
+              <Reorder.Group
+                axis="y"
+                values={filteredTasks}
+                onReorder={handleReorder}
+                className="grid grid-cols-1 gap-5"
+              >
                 {filteredTasks.length > 0 ? (
                   filteredTasks.map(task => (
-                    <TaskCard 
-                      key={task.id} 
-                      task={task} 
-                      onToggle={toggleTask} 
-                      onRate={rateTask} 
-                      onDelete={deleteTask} 
-                    />
+                    <Reorder.Item
+                      key={task.id}
+                      value={task}
+                      className="relative"
+                    >
+                      <TaskCard
+                        task={task}
+                        onToggle={toggleTask}
+                        onRate={rateTask}
+                        onDelete={deleteTask}
+                      />
+                    </Reorder.Item>
                   ))
                 ) : (
                   <div className="flex flex-col items-center justify-center py-24 bg-slate-900/20 rounded-[2.5rem] border-2 border-dashed border-white/5 text-slate-500 group hover:border-blue-500/20 transition-colors">
@@ -351,7 +515,7 @@ const App: React.FC = () => {
                     <p className="text-sm opacity-60">No tasks for this day. Ready to plan some?</p>
                   </div>
                 )}
-              </div>
+              </Reorder.Group>
             </>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -366,7 +530,13 @@ const App: React.FC = () => {
 
         {activeTab === 'board' && (
           <div className="lg:col-span-4 lg:sticky lg:top-28 h-[calc(100vh-10rem)]">
-            <ChatInterface onTasksGenerated={handleTasksGenerated} existingTasks={state.tasks} />
+            <ChatInterface
+              onTasksGenerated={handleTasksGenerated}
+              existingTasks={state.tasks}
+              messages={currentChatMessages}
+              onSendMessage={handleSendMessage}
+              isLoading={isChatLoading}
+            />
           </div>
         )}
       </main>

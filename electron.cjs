@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 
 // Set app name for proper userData path
 app.name = 'Lumina Planner';
@@ -15,14 +16,25 @@ async function readDataFile() {
     const raw = await fs.readFile(DATA_FILE, 'utf8');
     console.log('✓ Data file read successfully from:', DATA_FILE);
     const data = JSON.parse(raw);
-    if (!Array.isArray(data)) {
-      console.log('  Converting old format to new array format');
-      return [data];
+    if (Array.isArray(data)) {
+      console.log('  Mapping old array format to new state object');
+      // Migration logic: flatten old array to new state
+      const mergedState = {
+        tasks: [],
+        userName: 'User',
+        dailyMission: '',
+        chatHistory: {}
+      };
+      for (const entry of data) {
+        if (!mergedState.dailyMission && entry.dailyMission) mergedState.dailyMission = entry.dailyMission;
+        if (entry.tasks) mergedState.tasks.push(...entry.tasks);
+      }
+      return mergedState;
     }
     return data;
   } catch (e) {
     console.log('✗ No existing data file found at:', DATA_FILE);
-    return [];
+    return { tasks: [], userName: 'User', dailyMission: '', chatHistory: {} };
   }
 }
 
@@ -32,7 +44,7 @@ async function writeDataFile(dailyEntries) {
     await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
     await fs.writeFile(DATA_FILE, JSON.stringify(dailyEntries, null, 2), 'utf8');
     console.log('✓ Data saved successfully to:', DATA_FILE);
-    console.log('  Total entries preserved:', dailyEntries.length);
+    console.log('  State saved.');
     return true;
   } catch (e) {
     console.error('✗ Failed to write data file:', e);
@@ -56,10 +68,10 @@ function createWindow() {
   // Hide the menu bar
   win.removeMenu();
 
-  const url = isDev 
-    ? 'http://localhost:5173' 
+  const url = isDev
+    ? 'http://localhost:5173'
     : `file://${path.join(__dirname, 'dist', 'index.html')}`;
-  
+
   win.loadURL(url);
 
   // Show window in fullscreen
@@ -73,86 +85,23 @@ function createWindow() {
 app.whenReady().then(() => {
   console.log('🚀 App ready, setting up IPC handlers...');
   console.log('📁 Data file location:', DATA_FILE);
-  
+
   // IPC Handlers for storage
   ipcMain.handle('storage-save', async (event, state) => {
-    console.log('💾 IPC: storage-save called (append-only mode)');
-    const allEntries = await readDataFile();
-    
-    const today = new Date().toISOString().split('T')[0];
-    const todayIndex = allEntries.findIndex(e => e.date === today);
-    
-    const todayEntry = {
-      date: today,
-      tasks: state.tasks,
-      dailyMission: state.dailyMission,
-      userName: state.userName,
-      timestamp: new Date().toISOString()
-    };
-    
-    if (todayIndex < 0) {
-      // Add new entry for today
-      allEntries.unshift(todayEntry);
-      console.log('  ✓ New daily entry created');
-    } else {
-      // Update today's entry (same day, still appending)
-      allEntries[todayIndex] = todayEntry;
-      console.log('  ✓ Today\'s entry updated and saved');
-    }
-    
-    const ok = await writeDataFile(allEntries);
-    return { ok };
+    console.log('💾 IPC: storage-save called (snapshot mode)');
+    return await writeDataFile(state);
   });
 
   ipcMain.handle('storage-load', async () => {
     console.log('📂 IPC: storage-load called');
-    const allEntries = await readDataFile();
-    
-    // Merge all tasks from all dates
-    const mergedState = {
-      tasks: [],
-      userName: 'User',
-      dailyMission: ''
-    };
-    
-    // Iterate from newest to oldest
-    for (const entry of allEntries) {
-      if (!mergedState.dailyMission && entry.dailyMission) {
-        mergedState.dailyMission = entry.dailyMission;
-      }
-      if (entry.tasks && Array.isArray(entry.tasks)) {
-        mergedState.tasks.push(...entry.tasks);
-      }
-    }
-    
-    console.log('  Total entries in history:', allEntries.length);
-    console.log('  Merged tasks:', mergedState.tasks.length);
-    return mergedState;
+    return await readDataFile();
   });
 
   // Synchronous load for initial startup
   ipcMain.on('storage-load-sync', async (event) => {
     console.log('📂 IPC: storage-load-sync called');
-    const allEntries = await readDataFile();
-    
-    // Merge all tasks from all dates
-    const mergedState = {
-      tasks: [],
-      userName: 'User',
-      dailyMission: ''
-    };
-    
-    for (const entry of allEntries) {
-      if (!mergedState.dailyMission && entry.dailyMission) {
-        mergedState.dailyMission = entry.dailyMission;
-      }
-      if (entry.tasks && Array.isArray(entry.tasks)) {
-        mergedState.tasks.push(...entry.tasks);
-      }
-    }
-    
-    console.log('  Returning:', allEntries.length, 'date entries with', mergedState.tasks.length, 'total tasks');
-    event.returnValue = mergedState;
+    const data = await readDataFile();
+    event.returnValue = data;
   });
 
   ipcMain.handle('storage-clear', async () => {
@@ -163,6 +112,14 @@ app.whenReady().then(() => {
     } catch (e) {
       return { ok: false, error: e.message };
     }
+  });
+
+  /* =========================
+     Window Controls
+     ========================= */
+  ipcMain.on('minimize-app', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) win.minimize();
   });
 
   ipcMain.on('quit-app', () => {
