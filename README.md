@@ -1,20 +1,40 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Lumina Planner
+> Personal Focus Hub powered by AI.
 
-# Run and deploy your AI Studio app
+## Project Overview
+Lumina Planner is a desktop application built with Electron, React, and Gemini AI to help users organize their day, track tasks, and maintain focus.
 
-This contains everything you need to run your app locally.
+## 🛡️ CI/CD Paradigm (Rigorous)
+This project enforces a strict testing and validation pipeline to ensure high code quality.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ALxdxRpv29VyeBKYv-iaHxsIdE5EM44v
+### Local Gatekeeper (Husky)
+A `pre-push` hook is configured using **Husky**. 
+Every time you run `git push`, the following checks are automatically executed:
+1.  **Type Check**: `tsc --noEmit` (Ensures no TypeScript errors)
+2.  **Linting**: `eslint` (Ensures code style consistency)
+3.  **Unit Tests**: `vitest run` (Verifies logic correctness)
 
-## Run Locally
+**If any check fails, the push is blocked.** You must fix the errors before pushing.
 
-**Prerequisites:**  Node.js
+### Remote CI (GitHub Actions)
+The `.github/workflows/ci.yml` pipeline runs on every push and pull request to `main`. It performs the same checks in a clean environment to prevent "it works on my machine" issues.
 
+### How to Configure GitHub Repo
+To fully enforce this paradigm:
+1.  Go to Repository **Settings** -> **Branches**.
+2.  Add a Branch Protection Rule for `main`.
+3.  Enable **"Require status checks to pass before merging"**.
+4.  Select `test`, `lint`, and `typecheck` as required checks.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Development Scripts
+- `npm run dev:electron`: Start the app in development mode.
+- `npm run test`: Run unit tests.
+- `npm run validate`: Run all checks manually (Lint + Type + Test).
+- `npm run build`: Build the application for production.
+
+## Technology Stack
+- **Core**: Electron, React, TypeScript
+- **Styling**: TailwindCSS
+- **AI**: Google Gemini API
+- **Testing**: Vitest, React Testing Library
+- **CI**: GitHub Actions, Husky
