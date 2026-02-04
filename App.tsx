@@ -89,9 +89,6 @@ const App: React.FC = () => {
   /* =========================
      Persistence (SAFE)
      ========================= */
-  /* =========================
-     Persistence (SAFE)
-     ========================= */
   const isFirstRun = useRef(true);
 
   useEffect(() => {
@@ -107,6 +104,11 @@ const App: React.FC = () => {
       console.error('Auto-save failed:', err)
     );
   }, [state]);
+
+  /* =========================
+     Dropdown Handling
+     ========================= */
+  const [activeDropdown, setActiveDropdown] = useState<{ id: string; type: 'priority' | 'category' } | null>(null);
 
   /* =========================
      Task Handlers
@@ -144,6 +146,15 @@ const App: React.FC = () => {
             completedAt: !t.completed ? new Date().toISOString() : undefined
           }
           : t
+      )
+    }));
+  };
+
+  const updateTask = (id: string, updates: Partial<Task>) => {
+    setState(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t =>
+        t.id === id ? { ...t, ...updates } : t
       )
     }));
   };
@@ -514,6 +525,7 @@ const App: React.FC = () => {
                         onToggle={toggleTask}
                         onRate={rateTask}
                         onDelete={deleteTask}
+                        onUpdate={updateTask}
                       />
                     </Reorder.Item>
                   ))
