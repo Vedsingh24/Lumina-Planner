@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
@@ -17,7 +17,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     const completedTasks = tasks.filter(t => t.completed);
     const completed = completedTasks.length;
     const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
-    
+
     // Category distribution
     const categories: Record<string, { count: number, totalRating: number, ratedCount: number }> = {};
     tasks.forEach(t => {
@@ -31,8 +31,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
       }
     });
 
-    const categoryData = Object.entries(categories).map(([name, data]) => ({ 
-      name, 
+    const categoryData = Object.entries(categories).map(([name, data]) => ({
+      name,
       value: data.count,
       avgRating: data.ratedCount > 0 ? (data.totalRating / data.ratedCount).toFixed(1) : 0
     }));
@@ -102,20 +102,49 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     <div className="space-y-8">
       {/* Top Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Tasks', value: stats.total, color: 'text-slate-100', icon: '📋' },
-          { label: 'Completed', value: stats.completed, color: 'text-blue-400', icon: '✅' },
-          { label: 'Avg. Rating', value: stats.avgRating, color: 'text-yellow-400', icon: '⭐' },
-          { label: 'Efficiency', value: `${stats.rate}%`, color: 'text-green-400', icon: '⚡' }
-        ].map((card, i) => (
-          <div key={i} className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 shadow-sm">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{card.label}</p>
-              <span className="text-xl">{card.icon}</span>
+        {/* Total Tasks Card */}
+        <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 shadow-sm group hover:border-blue-500/30 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total Tasks</p>
+            <div className="text-blue-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" /><path d="M9 14h6" /><path d="M9 18h6" /><path d="M9 10h2" /></svg>
             </div>
-            <h2 className={`text-3xl font-black ${card.color}`}>{card.value}</h2>
           </div>
-        ))}
+          <h2 className="text-3xl font-black text-slate-100">{stats.total}</h2>
+        </div>
+
+        {/* Completed Card */}
+        <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 shadow-sm group hover:border-emerald-500/30 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Completed</p>
+            <div className="text-emerald-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" /></svg>
+            </div>
+          </div>
+          <h2 className="text-3xl font-black text-emerald-400">{stats.completed}</h2>
+        </div>
+
+        {/* Avg Rating Card */}
+        <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 shadow-sm group hover:border-amber-500/30 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Avg. Rating</p>
+            <div className="text-amber-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+            </div>
+          </div>
+          <h2 className="text-3xl font-black text-amber-400">{stats.avgRating}</h2>
+        </div>
+
+        {/* Efficiency Card */}
+        <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 shadow-sm group hover:border-violet-500/30 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Efficiency</p>
+            <div className="text-violet-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+            </div>
+          </div>
+          <h2 className="text-3xl font-black text-violet-400">{stats.rate}%</h2>
+        </div>
       </div>
 
       {/* Primary Row */}
@@ -130,18 +159,18 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
               <AreaChart data={stats.completionTrend}>
                 <defs>
                   <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                 <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
                   itemStyle={{ color: '#f8fafc' }}
                 />
-                <Legend verticalAlign="top" height={36}/>
+                <Legend verticalAlign="top" height={36} />
                 <Area name="Completed Tasks" type="monotone" dataKey="count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorTrend)" strokeWidth={3} />
                 <Line name="Avg Performance" type="monotone" dataKey="avgRating" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 4 }} />
               </AreaChart>
@@ -160,8 +189,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
                 <XAxis type="number" stroke="#64748b" fontSize={10} domain={[0, 100]} />
                 <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} width={60} />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}}
+                <Tooltip
+                  cursor={{ fill: 'transparent' }}
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
                 />
                 <Bar name="Completion Rate (%)" dataKey="rate" radius={[0, 4, 4, 0]}>
