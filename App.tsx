@@ -278,24 +278,17 @@ const App: React.FC = () => {
     });
 
     try {
-      const lowercaseInput = content.toLowerCase();
-      const isAgendaRequest = lowercaseInput.includes('agenda') ||
-        lowercaseInput.includes('tasks') ||
-        lowercaseInput.includes('plan') ||
-        content.length > 50;
-
       let replyContent = '';
 
-      if (isAgendaRequest) {
-        const newTasksData = await geminiService.processAgenda(content);
-        if (newTasksData && newTasksData.length > 0) {
-          handleTasksGenerated(newTasksData);
-          replyContent = `I've analyzed your notes and generated ${newTasksData.length} new tasks for you! Check them out in your task board.`;
-        } else {
-          throw new Error("No tasks extracted");
-        }
+      // Always attempt to interpret input as tasks first (User's request for smarter detection)
+      const newTasksData = await geminiService.processAgenda(content);
+
+      if (newTasksData && newTasksData.length > 0) {
+        handleTasksGenerated(newTasksData);
+        replyContent = `I've created ${newTasksData.length} new tasks for you. Check your board!`;
       } else {
-        replyContent = await geminiService.getChatResponse(content, state.tasks); // Pass all tasks for context
+        // If no tasks were found, use the conversational fallback
+        replyContent = await geminiService.getChatResponse(content, state.tasks);
       }
 
       // 3. Add Assistant Response

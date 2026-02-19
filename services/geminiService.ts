@@ -4,16 +4,26 @@ import { GoogleGenAI } from "@google/genai";
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const geminiService = {
-  // Convert a rough agenda into an array of simple task objects
-  processAgenda: async (agenda: string) => {
+  // Convert natural language into an array of simple task objects
+  processAgenda: async (input: string) => {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Extract specific, actionable tasks from the agenda below. Return ONLY a JSON array. For each task include title, description, category (Work/Personal/Health/Finance/Learning) and priority (low/medium/high).\n\nAgenda: "${agenda}"`,
+        contents: `Analyze the following user input and extract any specific, actionable tasks. 
+        If the input contains tasks (explicit or implied), return ONLY a valid JSON array of task objects.
+        For each task include:
+        - title (string)
+        - description (string, brief)
+        - category (one of: General, Work, Personal, Health, Finance, Learning)
+        - priority (one of: low, medium, high)
+
+        If the input is conversational, a greeting, or contains NO actionable tasks, return exactly: []
+        
+        User Input: "${input}"`,
       });
 
       const text = (response && response.text) ? response.text.trim() : '';
-      // Try to find a JSON array inside the response
+      // Try to find a JSON array inside the response (handles markdown code blocks if any)
       const match = text.match(/\[[\s\S]*\]/);
       if (!match) return [];
       const parsed = JSON.parse(match[0]);

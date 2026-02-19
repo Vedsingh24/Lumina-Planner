@@ -36,15 +36,8 @@ describe('TaskCard Component', () => {
     it('calls onToggle when checkbox is clicked', () => {
         render(<TaskCard task={mockTask} {...mockHandlers} />);
 
-        const toggleBtn = screen.getByRole('button', { name: '' }); // The first button is usually toggle
-        // However, since we have multiple buttons, it's safer to find by selector or testid if added.
-        // For now, let's rely on the svg presence or order. The first button in code is toggle.
-        // Better strategy: Add aria-label to buttons in source code for better testing. 
-        // But for this example, let's just click the button that wraps the check icon logic.
-
-        // Actually, let's just trigger the first button found
-        const buttons = screen.getAllByRole('button');
-        fireEvent.click(buttons[0]);
+        const toggleBtn = screen.getByLabelText('Toggle task completion');
+        fireEvent.click(toggleBtn);
 
         expect(mockHandlers.onToggle).toHaveBeenCalledWith('test-1');
     });
@@ -52,8 +45,7 @@ describe('TaskCard Component', () => {
     it('calls onDelete when trash icon is clicked', () => {
         render(<TaskCard task={mockTask} {...mockHandlers} />);
 
-        // The delete button is the last button in the main row
-        const deleteBtn = screen.getAllByRole('button')[1];
+        const deleteBtn = screen.getByLabelText('Delete task');
         fireEvent.click(deleteBtn);
 
         expect(mockHandlers.onDelete).toHaveBeenCalledWith('test-1');
