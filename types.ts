@@ -13,11 +13,19 @@ export interface Task {
   date: string; // YYYY-MM-DD
 }
 
+export interface Note {
+  id: string;
+  text: string;
+  isCustomHtml?: boolean; // If it contains custom formatted text like bold/italic or images
+  createdAt: string;
+}
+
 export interface PlannerState {
   tasks: Task[];
   userName: string;
   dailyMission?: string;
   chatHistory: Record<string, ChatMessage[]>;
+  notes?: Note[];
 }
 
 export interface ChatMessage {

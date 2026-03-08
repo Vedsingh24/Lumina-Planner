@@ -2,23 +2,25 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Reorder } from 'framer-motion';
 import { storageService } from './services/storageService';
 import { geminiService } from './services/geminiService';
-import { Task, PlannerState, ChatMessage } from './types';
+import { Task, PlannerState, ChatMessage, Note } from './types';
 import ChatInterface from './components/ChatInterface';
 import TaskCard from './components/TaskCard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import CalendarPicker from './components/CalendarPicker';
+import NotesTaker from './components/NotesTaker';
 
 const App: React.FC = () => {
   const [state, setState] = useState<PlannerState>({
     tasks: [],
     userName: 'User',
     dailyMission: '',
-    chatHistory: {}
+    chatHistory: {},
+    notes: []
   });
 
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'board' | 'analytics'>('board');
+  const [activeTab, setActiveTab] = useState<'board' | 'analytics' | 'notes'>('board');
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -30,6 +32,30 @@ const App: React.FC = () => {
   const hasHydratedRef = useRef(false);
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualDesc, setManualDesc] = useState('');
+  const [manualCategory, setManualCategory] = useState<string>('General');
+  const [manualPriority, setManualPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
+  const handleManualAdd = () => {
+    if (!manualTitle.trim()) return;
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      title: manualTitle.trim(),
+      description: manualDesc.trim(),
+      category: manualCategory,
+      priority: manualPriority,
+      completed: false,
+      rating: null,
+      createdAt: new Date().toISOString(),
+      date: selectedDate
+    };
+    setState(prev => ({ ...prev, tasks: [newTask, ...prev.tasks] }));
+    setManualTitle('');
+    setManualDesc('');
+    setIsManualEntryOpen(false);
+  };
 
   /* =========================
      App Exit (Ctrl+Q / Button)
@@ -207,9 +233,74 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleMergeTask = (id: string) => {
+    setState(prev => {
+      const visibleTasks = prev.tasks.filter(t => {
+        if (t.date !== selectedDate) return false;
+        if (filter === 'pending') return !t.completed;
+        if (filter === 'completed') return t.completed;
+        return true;
+      });
+
+      const idxInVisible = visibleTasks.findIndex(t => t.id === id);
+      if (idxInVisible === -1 || idxInVisible === visibleTasks.length - 1) return prev;
+
+      const nextTaskInVisible = visibleTasks[idxInVisible + 1];
+
+      const mergedTask: Task = {
+        ...visibleTasks[idxInVisible],
+        title: `${visibleTasks[idxInVisible].title} & ${nextTaskInVisible.title}`,
+        description: `${visibleTasks[idxInVisible].description}\n\nmerged:\n${nextTaskInVisible.description}`.trim()
+      };
+
+      return {
+        ...prev,
+        tasks: prev.tasks.map(t => {
+          if (t.id === mergedTask.id) return mergedTask;
+          return t;
+        }).filter(t => t.id !== nextTaskInVisible.id)
+      };
+    });
+  };
+
+  /* =========================
+     Note Handlers
+     ========================= */
+  const handleAddNote = (note: Note) => {
+    setState(prev => ({ ...prev, notes: [note, ...(prev.notes || [])] }));
+  };
+
+  const handleUpdateNote = (id: string, updates: Partial<Note>) => {
+    setState(prev => ({
+      ...prev,
+      notes: (prev.notes || []).map(n => n.id === id ? { ...n, ...updates } : n)
+    }));
+  };
+
+  const handleDeleteNote = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      notes: (prev.notes || []).filter(n => n.id !== id)
+    }));
+  };
+
   /* =========================
      Mission Editing
      ========================= */
+  const [isGeneratingMission, setIsGeneratingMission] = useState(false);
+
+  const handleGenerateMission = async () => {
+    setIsGeneratingMission(true);
+    try {
+      const newMission = await geminiService.generateDailyMission();
+      setState(prev => ({ ...prev, dailyMission: newMission }));
+    } catch (error: any) {
+      alert(error.message || "Failed to generate mission.");
+    } finally {
+      setIsGeneratingMission(false);
+    }
+  };
+
   const startEditingMission = () => {
     setTempMission(state.dailyMission || '');
     setIsEditingMission(true);
@@ -367,6 +458,13 @@ const App: React.FC = () => {
               Insights
             </button>
             <button
+              onClick={() => setActiveTab('notes')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'notes' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'
+                }`}
+            >
+              Notes
+            </button>
+            <button
               onClick={() => {
                 try {
                   (window as any).require?.('electron')?.ipcRenderer?.send('minimize-app');
@@ -403,12 +501,23 @@ const App: React.FC = () => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 opacity-80">Daily Mission</span>
                         {!isEditingMission && (
-                          <button
-                            onClick={startEditingMission}
-                            className="text-[10px] text-slate-500 hover:text-blue-400 uppercase tracking-widest font-bold transition-colors"
-                          >
-                            Edit
-                          </button>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={handleGenerateMission}
+                              disabled={isGeneratingMission}
+                              className={`text-[10px] uppercase tracking-widest font-bold transition-colors flex items-center gap-1 ${isGeneratingMission ? 'text-slate-600 cursor-not-allowed' : 'text-slate-500 hover:text-blue-400'}`}
+                              title="Generate new mission (Max 3/day)"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGeneratingMission ? "animate-spin" : ""}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
+                              <span>Generate</span>
+                            </button>
+                            <button
+                              onClick={startEditingMission}
+                              className="text-[10px] text-slate-500 hover:text-blue-400 uppercase tracking-widest font-bold transition-colors"
+                            >
+                              Edit
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -424,7 +533,7 @@ const App: React.FC = () => {
                                 saveMission();
                               }
                             }}
-                            className="w-full bg-slate-900/50 border border-blue-500/30 rounded-xl p-3 text-lg md:text-xl font-medium text-white outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full bg-slate-900/50 border border-blue-500/30 rounded-xl p-3 text-base md:text-lg font-medium text-white outline-none focus:ring-1 focus:ring-blue-500"
                             rows={2}
                           />
                           <div className="flex justify-end gap-2">
@@ -443,12 +552,17 @@ const App: React.FC = () => {
                           </div>
                         </div>
                       ) : (
-                        <h2
+                        <div
                           onClick={startEditingMission}
-                          className="text-xl md:text-2xl font-semibold text-white/90 italic tracking-tight leading-relaxed cursor-pointer hover:text-white transition-colors group-hover:translate-x-1 transition-transform"
+                          className="cursor-pointer group-hover:translate-x-1 transition-transform"
                         >
-                          "{state.dailyMission || 'Define your focus for today...'}"
-                        </h2>
+                          <h2 className="text-base md:text-lg font-semibold text-white/90 italic tracking-tight leading-relaxed hover:text-white transition-colors line-clamp-2">
+                            {state.dailyMission ? state.dailyMission.split(' - ')[0] : 'Define your focus for today...'}
+                          </h2>
+                          {state.dailyMission && state.dailyMission.includes(' - ') && (
+                            <p className="text-xs text-blue-400 mt-1 font-medium tracking-wide">— {state.dailyMission.split(' - ').pop()}</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -497,8 +611,67 @@ const App: React.FC = () => {
                       {f}
                     </button>
                   ))}
+                  <div className="w-px h-6 bg-white/10 mx-1"></div>
+                  <button
+                    onClick={() => setIsManualEntryOpen(!isManualEntryOpen)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-1 ${isManualEntryOpen ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+                    title="Add Entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    New
+                  </button>
                 </div>
               </div>
+
+              {isManualEntryOpen && (
+                <div className="bg-slate-800/80 p-5 rounded-2xl border border-blue-500/30 animate-in fade-in slide-in-from-top-4 duration-300 shadow-xl shadow-black/20">
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Task Title..."
+                      className="bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white font-medium outline-none focus:border-blue-500 transition-colors"
+                      value={manualTitle}
+                      onChange={e => setManualTitle(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleManualAdd(); }}
+                    />
+                    <div className="flex gap-3 items-start flex-col sm:flex-row">
+                      <textarea
+                        placeholder="Description (Optional)"
+                        className="bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-300 outline-none focus:border-blue-500 transition-colors flex-1 w-full resize-none h-10"
+                        value={manualDesc}
+                        onChange={e => setManualDesc(e.target.value)}
+                      />
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <select
+                          className="bg-slate-900/50 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none focus:border-blue-500"
+                          value={manualPriority}
+                          onChange={e => setManualPriority(e.target.value as any)}
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                        <select
+                          className="bg-slate-900/50 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none focus:border-blue-500"
+                          value={manualCategory}
+                          onChange={e => setManualCategory(e.target.value)}
+                        >
+                          {['General', 'Work', 'Personal', 'Health', 'Finance', 'Learning'].map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleManualAdd}
+                          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Reorder.Group
                 axis="y"
@@ -507,7 +680,7 @@ const App: React.FC = () => {
                 className="grid grid-cols-1 gap-5"
               >
                 {filteredTasks.length > 0 ? (
-                  filteredTasks.map(task => (
+                  filteredTasks.map((task, index) => (
                     <Reorder.Item
                       key={task.id}
                       value={task}
@@ -519,6 +692,9 @@ const App: React.FC = () => {
                         onRate={rateTask}
                         onDelete={deleteTask}
                         onUpdate={updateTask}
+                        onMerge={handleMergeTask}
+                        isFirst={index === 0}
+                        isLast={index === filteredTasks.length - 1}
                       />
                     </Reorder.Item>
                   ))
@@ -533,13 +709,22 @@ const App: React.FC = () => {
                 )}
               </Reorder.Group>
             </>
-          ) : (
+          ) : activeTab === 'analytics' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
               <div className="mb-10">
                 <h2 className="text-4xl font-black text-white tracking-tight mb-2">Your Velocity</h2>
                 <p className="text-slate-500 text-lg">Visualizing your progress over the last few weeks.</p>
               </div>
               <AnalyticsDashboard tasks={state.tasks} />
+            </div>
+          ) : (
+            <div className="h-[calc(100vh-12rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <NotesTaker
+                notes={state.notes || []}
+                onAddNote={handleAddNote}
+                onUpdateNote={handleUpdateNote}
+                onDeleteNote={handleDeleteNote}
+              />
             </div>
           )}
         </div>

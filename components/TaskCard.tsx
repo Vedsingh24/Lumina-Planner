@@ -8,15 +8,21 @@ interface TaskCardProps {
   onRate: (id: string, rating: number) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
-  activeDropdown: 'priority' | 'category' | null;
-  onSetActiveDropdown: (type: 'priority' | 'category' | null) => void;
+  onMerge?: (id: string) => void; // Optional merge handler
+  activeDropdown?: 'priority' | 'category' | null;
+  onSetActiveDropdown?: (type: 'priority' | 'category' | null) => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
 const CATEGORIES = ['General', 'Work', 'Personal', 'Health', 'Finance', 'Learning'];
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, onUpdate }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, onUpdate, onMerge, isFirst, isLast }) => {
   const [activeDropdown, setActiveDropdown] = useState<'priority' | 'category' | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editDesc, setEditDesc] = useState(task.description);
 
   const getPriorityColor = (p: Priority) => {
     switch (p) {
@@ -27,17 +33,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
     }
   };
 
+  const handleSaveEdit = () => {
+    onUpdate(task.id, { title: editTitle, description: editDesc });
+    setIsEditing(false);
+  };
+
   return (
     <div className={`group relative p-4 rounded-xl border transition-all duration-300 ${task.completed
       ? 'bg-slate-800/40 border-slate-700 opacity-75'
       : 'bg-slate-800 border-slate-700 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5'
       }`}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 w-full">
           <button
             onClick={() => onToggle(task.id)}
             aria-label="Toggle task completion"
-            className={`mt-1 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${task.completed
+            className={`mt-1 flex-shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${task.completed
               ? 'bg-blue-600 border-blue-600 text-white'
               : 'border-slate-600 hover:border-blue-500'
               }`}
@@ -45,8 +56,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
             {task.completed && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
           </button>
 
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1 relative z-10">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 relative z-10 w-full flex-wrap">
               {/* Priority Badge */}
               <div className="relative">
                 <button
@@ -127,22 +138,61 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
               </div>
             </div>
 
-            <h4 className={`font-semibold text-slate-100 ${task.completed ? 'line-through text-slate-500' : ''}`}>
-              {task.title}
-            </h4>
-            <p className="text-sm text-slate-400 mt-1 line-clamp-2">
-              {task.description}
-            </p>
+            {isEditing ? (
+              <div className="flex flex-col gap-2 mt-2 z-10 relative">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="bg-slate-900/50 border border-blue-500/30 rounded-lg px-3 py-2 text-sm font-semibold text-white outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                  placeholder="Task title"
+                />
+                <textarea
+                  value={editDesc}
+                  onChange={e => setEditDesc(e.target.value)}
+                  className="bg-slate-900/50 border border-blue-500/30 rounded-lg px-3 py-2 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-blue-500 min-h-[60px] w-full resize-none"
+                  placeholder="Task description"
+                />
+                <div className="flex justify-end gap-2 mt-1">
+                  <button onClick={() => {
+                    setIsEditing(false);
+                    setEditTitle(task.title);
+                    setEditDesc(task.description);
+                  }} className="px-3 py-1 rounded-md text-[10px] uppercase font-bold text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors">Cancel</button>
+                  <button onClick={handleSaveEdit} className="px-3 py-1 rounded-md text-[10px] uppercase font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors">Save</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h4 className={`font-semibold text-slate-100 break-words ${task.completed ? 'line-through text-slate-500' : ''}`}>
+                  {task.title}
+                </h4>
+                <p className="text-sm text-slate-400 mt-1 line-clamp-2 break-words">
+                  {task.description}
+                </p>
+              </>
+            )}
           </div>
         </div>
 
-        <button
-          onClick={() => onDelete(task.id)}
-          aria-label="Delete task"
-          className="p-1.5 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        {!isEditing && (
+          <div className="flex flex-row gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1">
+            <button
+              onClick={() => setIsEditing(true)}
+              aria-label="Edit task"
+              className="p-1.5 text-slate-500 hover:text-blue-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-blue-500/30 transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </button>
+            <button
+              onClick={() => onDelete(task.id)}
+              aria-label="Delete task"
+              className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-red-500/30 transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {task.completed && (
@@ -160,6 +210,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Hover Merge Button */}
+      {onMerge && !task.completed && !isEditing && !isFirst && !isLast && (
+        <div className="absolute -bottom-[14px] left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <button
+            onClick={() => onMerge(task.id)}
+            className="text-slate-500 hover:text-blue-400 bg-slate-800 px-3 py-0.5 rounded-full shadow-lg border border-slate-700 hover:border-blue-500/50 flex items-center gap-1 justify-center transform hover:scale-105 transition-all group/merge"
+            title="Merge with next task"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-widest hidden group-hover/merge:block">Merge</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover/merge:translate-y-[1px] transition-transform"><path d="M8 18L12 22L16 18" /><path d="M12 2V22" /><path d="M8 6L12 2L16 6" /></svg>
+          </button>
         </div>
       )}
     </div>

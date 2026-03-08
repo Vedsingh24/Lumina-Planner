@@ -8,17 +8,17 @@ export const geminiService = {
   processAgenda: async (input: string) => {
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Analyze the following user input and extract any specific, actionable tasks. 
-        If the input contains tasks (explicit or implied), return ONLY a valid JSON array of task objects.
+        model: 'gemini-2.5-flash',
+        contents: `Analyze the following user input.
+        If the input is complete gibberish or clearly not actionable, return exactly an empty array: []
+        If the input has poor grammar but implies actionable tasks, auto-correct the intent and extract the tasks.
+        Return ONLY a valid JSON array of task objects (no markdown, no backticks).
         For each task include:
         - title (string)
         - description (string, brief)
         - category (one of: General, Work, Personal, Health, Finance, Learning)
         - priority (one of: low, medium, high)
 
-        If the input is conversational, a greeting, or contains NO actionable tasks, return exactly: []
-        
         User Input: "${input}"`,
       });
 
@@ -43,7 +43,7 @@ export const geminiService = {
       if (cached && cacheDay === today) return cached;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: 'Generate a one-sentence daily productivity mission for a personal planner. Keep it under 15 words.',
       });
       const text = response && response.text ? response.text.trim() : 'Make today count.';
@@ -67,5 +67,32 @@ export const geminiService = {
       "Love the ambition. What's the first step?"
     ];
     return canned[Math.floor(Math.random() * canned.length)];
+  },
+
+  // Generate a new daily mission on demand (limit 3 per day)
+  generateDailyMission: async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const usageKey = `dailyMissionUsage_${today}`;
+      const count = parseInt(localStorage.getItem(usageKey) || '0', 10);
+
+      if (count >= 3) {
+        throw new Error("Daily mission generation limit reached (3/3).");
+      }
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: 'Generate exactly ONE inspirational, deep, optimistic, and thought-provoking philosophical quote from a famous author or philosopher. The quote must be short (under 20 words). Format the output exactly as: "Quote text here." - Author Name. Do NOT return a list or extra text.',
+      });
+      const text = response && response.text ? response.text.trim().replace(/"/g, '') : 'Fulfill your duty with goodness.';
+
+      localStorage.setItem(usageKey, (count + 1).toString());
+      localStorage.setItem('dailyInspirationCache', text);
+      localStorage.setItem('dailyInspirationTime', today);
+      return text;
+    } catch (e) {
+      console.error('generateDailyMission error:', e);
+      throw e;
+    }
   }
 };
