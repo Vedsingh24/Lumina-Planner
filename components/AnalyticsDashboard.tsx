@@ -59,27 +59,18 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     const ratings = completedTasks.filter(t => t.rating !== null).map(t => t.rating as number);
     const avgRating = ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : 'N/A';
 
-    // Daily completion trend & Weekday stats
+    // Daily completion trend & Month stats
     const dateGroups: Record<string, { date: string, count: number, rating: number, ratedCount: number, assigned: number }> = {};
-    const weekdayCounts: Record<string, { name: string, assigned: number, completed: number }> = {
-      Sun: { name: 'Sun', assigned: 0, completed: 0 },
-      Mon: { name: 'Mon', assigned: 0, completed: 0 },
-      Tue: { name: 'Tue', assigned: 0, completed: 0 },
-      Wed: { name: 'Wed', assigned: 0, completed: 0 },
-      Thu: { name: 'Thu', assigned: 0, completed: 0 },
-      Fri: { name: 'Fri', assigned: 0, completed: 0 },
-      Sat: { name: 'Sat', assigned: 0, completed: 0 },
-    };
+    const monthCounts: Record<string, { name: string, assigned: number }> = {};
 
     tasks.forEach(task => {
       const date = task.date;
 
       const d = new Date(date);
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-      if (weekdayCounts[dayName]) {
-        weekdayCounts[dayName].assigned++;
-        if (task.completed) weekdayCounts[dayName].completed++;
-      }
+      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+      if (!monthCounts[monthName]) monthCounts[monthName] = { name: monthName, assigned: 0 };
+      monthCounts[monthName].assigned++;
 
       if (!dateGroups[date]) {
         dateGroups[date] = { date, count: 0, rating: 0, ratedCount: 0, assigned: 0 };
@@ -99,15 +90,16 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
       .slice(-14)
       .map(d => ({
         ...d,
-        avgRating: d.ratedCount > 0 ? parseFloat((d.rating / d.ratedCount).toFixed(1)) : 0
+        avgRating: d.ratedCount > 0 ? parseFloat((d.rating / d.ratedCount).toFixed(1)) : 0,
+        efficiency: d.assigned > 0 ? Math.round((d.count / d.assigned) * 100) : 0
       }));
 
-    const weekdayData = Object.values(weekdayCounts).map(d => ({
-      ...d,
-      efficiency: d.assigned > 0 ? Math.round((d.completed / d.assigned) * 100) : 0
-    }));
+    const monthData = Object.values(monthCounts).sort((a, b) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return months.indexOf(a.name) - months.indexOf(b.name);
+    });
 
-    return { total, completed, rate, categoryData, avgRating, completionTrend, priorityData, weekdayData };
+    return { total, completed, rate, categoryData, avgRating, completionTrend, priorityData, monthData };
   }, [tasks]);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
@@ -203,32 +195,34 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
           </div>
         </div>
 
-        {/* Priority Efficiency */}
+        {/* Day Efficiency */}
         <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 h-[400px]">
           <h3 className="text-sm font-bold text-slate-300 mb-8 uppercase tracking-widest flex items-center gap-2">
-            <div className="w-1 h-4 bg-red-500 rounded-full"></div> Priority Breakdown
+            <div className="w-1 h-4 bg-violet-500 rounded-full"></div> Day Efficiency
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.priorityData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
-                <XAxis type="number" stroke="#64748b" fontSize={10} domain={[0, 100]} />
-                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} width={60} />
+              <AreaChart data={stats.completionTrend}>
+                <defs>
+                  <linearGradient id="colorEfficiency" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} />
                 <Tooltip
-                  cursor={{ fill: 'transparent' }}
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
                   itemStyle={{ color: '#f8fafc' }}
                   labelStyle={{ color: '#94a3b8' }}
                 />
-                <Bar name="Completion Rate (%)" dataKey="rate" radius={[0, 4, 4, 0]}>
-                  {stats.priorityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.name === 'High' ? '#ef4444' : entry.name === 'Medium' ? '#f59e0b' : '#10b981'} />
-                  ))}
-                </Bar>
-              </BarChart>
+                <Legend verticalAlign="top" height={36} />
+                <Area name="Efficiency (%)" type="monotone" dataKey="efficiency" stroke="#a78bfa" fillOpacity={1} fill="url(#colorEfficiency)" strokeWidth={3} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[10px] text-slate-500 mt-4 text-center">Shows percentage of tasks completed per priority level.</p>
+          <p className="text-[10px] text-slate-500 mt-4 text-center">Percentage of assigned tasks completed per day.</p>
         </div>
       </div>
 
@@ -286,45 +280,42 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
 
       {/* Tertiary Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-        {/* Day Efficiency */}
+        {/* Priority Breakdown */}
         <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 h-[400px]">
           <h3 className="text-sm font-bold text-slate-300 mb-8 uppercase tracking-widest flex items-center gap-2">
-            <div className="w-1 h-4 bg-violet-500 rounded-full"></div> Day Efficiency
+            <div className="w-1 h-4 bg-red-500 rounded-full"></div> Priority Breakdown
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.completionTrend}>
-                <defs>
-                  <linearGradient id="colorAssigned" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#64748b" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#64748b" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+              <BarChart data={stats.priorityData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={10} domain={[0, 100]} />
+                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} width={60} />
                 <Tooltip
+                  cursor={{ fill: 'transparent' }}
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
                   itemStyle={{ color: '#f8fafc' }}
                   labelStyle={{ color: '#94a3b8' }}
                 />
-                <Legend verticalAlign="top" height={36} />
-                <Area name="Assigned" type="step" dataKey="assigned" stroke="#64748b" fillOpacity={1} fill="url(#colorAssigned)" strokeWidth={2} />
-                <Line name="Completed" type="monotone" dataKey="count" stroke="#a78bfa" strokeWidth={3} dot={{ fill: '#a78bfa', r: 4 }} />
-              </AreaChart>
+                <Bar name="Completion Rate (%)" dataKey="rate" radius={[0, 4, 4, 0]}>
+                  {stats.priorityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.name === 'High' ? '#ef4444' : entry.name === 'Medium' ? '#f59e0b' : '#10b981'} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[10px] text-slate-500 mt-4 text-center">Efficiency: Tasks assigned on the day vs. actually performed.</p>
+          <p className="text-[10px] text-slate-500 mt-4 text-center">Shows percentage of tasks completed per priority level.</p>
         </div>
 
-        {/* Weekday Productivity */}
+        {/* Monthly Tasks */}
         <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 h-[400px]">
           <h3 className="text-sm font-bold text-slate-300 mb-8 uppercase tracking-widest flex items-center gap-2">
-            <div className="w-1 h-4 bg-emerald-500 rounded-full"></div> Weekday Consistency
+            <div className="w-1 h-4 bg-emerald-500 rounded-full"></div> Monthly Tasks
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.weekdayData}>
+              <BarChart data={stats.monthData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
@@ -334,11 +325,11 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
                   itemStyle={{ color: '#f8fafc' }}
                   labelStyle={{ color: '#94a3b8' }}
                 />
-                <Bar name="Efficiency (%)" dataKey="efficiency" radius={[4, 4, 0, 0]} fill="#10b981" />
+                <Bar name="Assigned Tasks" dataKey="assigned" radius={[4, 4, 0, 0]} fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[10px] text-slate-500 mt-4 text-center">Average completion rate mapped to days of the week.</p>
+          <p className="text-[10px] text-slate-500 mt-4 text-center">Total number of tasks assigned across different months.</p>
         </div>
       </div>
     </div>
