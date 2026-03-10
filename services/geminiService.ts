@@ -20,6 +20,10 @@ export const geminiService = {
         - priority (one of: low, medium, high)
 
         User Input: "${input}"`,
+        config: { 
+          temperature: 0,
+          responseMimeType: "application/json"
+        }
       });
 
       const text = (response && response.text) ? response.text.trim() : '';
@@ -45,6 +49,7 @@ export const geminiService = {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: 'Generate a one-sentence daily productivity mission for a personal planner. Keep it under 15 words.',
+        config: { temperature: 0.4 }
       });
       const text = response && response.text ? response.text.trim() : 'Make today count.';
       localStorage.setItem('dailyInspirationCache', text);
@@ -83,6 +88,7 @@ export const geminiService = {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: 'Generate exactly ONE inspirational, deep, optimistic, and thought-provoking philosophical quote from a famous author or philosopher. The quote must be short (under 20 words). Format the output exactly as: "Quote text here." - Author Name. Do NOT return a list or extra text.',
+        config: { temperature: 0.6 }
       });
       const text = response && response.text ? response.text.trim().replace(/"/g, '') : 'Fulfill your duty with goodness.';
 

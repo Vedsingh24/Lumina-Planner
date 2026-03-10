@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const hasHydratedRef = useRef(false);
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const constraintsRef = useRef<HTMLDivElement>(null);
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
   const [manualTitle, setManualTitle] = useState('');
   const [manualDesc, setManualDesc] = useState('');
@@ -673,41 +674,68 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <Reorder.Group
-                axis="y"
-                values={filteredTasks}
-                onReorder={handleReorder}
-                className="grid grid-cols-1 gap-5"
-              >
-                {filteredTasks.length > 0 ? (
-                  filteredTasks.map((task, index) => (
-                    <Reorder.Item
-                      key={task.id}
-                      value={task}
-                      className="relative"
-                    >
-                      <TaskCard
-                        task={task}
-                        onToggle={toggleTask}
-                        onRate={rateTask}
-                        onDelete={deleteTask}
-                        onUpdate={updateTask}
-                        onMerge={handleMergeTask}
-                        isFirst={index === 0}
-                        isLast={index === filteredTasks.length - 1}
-                      />
-                    </Reorder.Item>
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-24 bg-slate-900/20 rounded-[2.5rem] border-2 border-dashed border-white/5 text-slate-500 group hover:border-blue-500/20 transition-colors">
-                    <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <div ref={constraintsRef} className="relative flex-1 flex flex-col min-h-0 pb-12 mt-12">
+                <Reorder.Group
+                  axis="y"
+                  values={filteredTasks}
+                  onReorder={handleReorder}
+                  className="grid grid-cols-1 gap-5"
+                >
+                  {filteredTasks.length > 0 ? (
+                    filteredTasks.map((task, index) => (
+                      <Reorder.Item
+                        key={task.id}
+                        value={task}
+                        className="relative"
+                        dragConstraints={constraintsRef}
+                        onDrag={(e, info) => {
+                          const buffer = 100; // threshold from edge
+                          const scrollSpeed = 15; // constant scroll pixels
+
+                          // Get viewport-relative Y coordinate
+                          let clientY = 0;
+                          if ('clientY' in e) {
+                            clientY = (e as MouseEvent).clientY;
+                          } else if ('touches' in e && (e as TouchEvent).touches.length > 0) {
+                            clientY = (e as TouchEvent).touches[0].clientY;
+                          } else {
+                            // Fallback to point relative to scroll
+                            clientY = info.point.y - window.scrollY;
+                          }
+
+                          const windowHeight = window.innerHeight;
+                          const maxScroll = Math.max(0, document.documentElement.scrollHeight - windowHeight);
+
+                          if (clientY < buffer && window.scrollY > 0) {
+                            window.scrollBy(0, -scrollSpeed);
+                          } else if (clientY > windowHeight - buffer && window.scrollY < maxScroll) {
+                            window.scrollBy(0, scrollSpeed);
+                          }
+                        }}
+                      >
+                        <TaskCard
+                          task={task}
+                          onToggle={toggleTask}
+                          onRate={rateTask}
+                          onDelete={deleteTask}
+                          onUpdate={updateTask}
+                          onMerge={handleMergeTask}
+                          isFirst={index === 0}
+                          isLast={index === filteredTasks.length - 1}
+                        />
+                      </Reorder.Item>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-24 bg-slate-900/20 rounded-[2.5rem] border-2 border-dashed border-white/5 text-slate-500 group hover:border-blue-500/20 transition-colors">
+                      <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                      </div>
+                      <h3 className="text-slate-300 font-semibold mb-1">Clear Horizon</h3>
+                      <p className="text-sm opacity-60">No tasks for this day. Ready to plan some?</p>
                     </div>
-                    <h3 className="text-slate-300 font-semibold mb-1">Clear Horizon</h3>
-                    <p className="text-sm opacity-60">No tasks for this day. Ready to plan some?</p>
-                  </div>
-                )}
-              </Reorder.Group>
+                  )}
+                </Reorder.Group>
+              </div>
             </>
           ) : activeTab === 'analytics' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">

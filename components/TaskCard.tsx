@@ -214,7 +214,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
       )}
 
       {/* Hover Merge Button */}
-      {onMerge && !task.completed && !isEditing && !isFirst && !isLast && (
+      {onMerge && !task.completed && !isEditing && !isLast && (
         <div className="absolute -bottom-[14px] left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
           <button
             onClick={() => onMerge(task.id)}
