@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
@@ -10,6 +10,64 @@ import { Task } from '../types';
 interface AnalyticsDashboardProps {
   tasks: Task[];
 }
+
+// --- Reusable Paginated Chart Wrapper with Hover Arrows ---
+interface PaginatedChartProps {
+  title: string;
+  accentColor: string;
+  data: any[];
+  pageSize: number;
+  subtitle?: string;
+  renderChart: (pageData: any[], pageKey: string) => React.ReactNode;
+}
+
+const PaginatedChart: React.FC<PaginatedChartProps> = ({ title, accentColor, data, pageSize, subtitle, renderChart }) => {
+  const [page, setPage] = useState(0);
+  const maxPage = Math.max(0, Math.ceil(data.length / pageSize) - 1);
+  
+  // page 0 = most recent, page 1 = previous window, etc.
+  const startIdx = Math.max(0, data.length - pageSize * (page + 1));
+  const endIdx = data.length - pageSize * page;
+  const pageData = data.slice(startIdx, endIdx);
+  
+  const canGoBack = page < maxPage;
+  const canGoForward = page > 0;
+
+  const colorMap: Record<string, string> = { blue: '#3b82f6', violet: '#8b5cf6', emerald: '#10b981' };
+  const accent = colorMap[accentColor] || '#3b82f6';
+
+  return (
+    <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 h-[400px] relative group/chart">
+      <h3 className="text-sm font-bold text-slate-300 mb-8 uppercase tracking-widest flex items-center gap-2">
+        <div className="w-1 h-4 rounded-full" style={{ backgroundColor: accent }}></div> {title}
+        {page > 0 && <span className="text-[10px] text-slate-500 font-normal normal-case ml-2">({pageSize * page}d ago)</span>}
+      </h3>
+      
+      {/* Hover Navigation Arrows */}
+      {canGoBack && (
+        <button 
+          onClick={() => setPage(p => p + 1)}
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-600 flex items-center justify-center opacity-0 group-hover/chart:opacity-100 transition-all duration-300 backdrop-blur-sm shadow-lg"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      )}
+      {canGoForward && (
+        <button 
+          onClick={() => setPage(p => p - 1)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-600 flex items-center justify-center opacity-0 group-hover/chart:opacity-100 transition-all duration-300 backdrop-blur-sm shadow-lg"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      )}
+
+      <div className="h-64">
+        {renderChart(pageData, `${title}-page-${page}`)}
+      </div>
+      {subtitle && <p className="text-[10px] text-slate-500 mt-4 text-center">{subtitle}</p>}
+    </div>
+  );
+};
 
 const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
   const stats = useMemo(() => {
@@ -87,7 +145,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
 
     const completionTrend = Object.values(dateGroups)
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-14)
       .map(d => ({
         ...d,
         avgRating: d.ratedCount > 0 ? parseFloat((d.rating / d.ratedCount).toFixed(1)) : 0,
@@ -166,13 +223,14 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
       {/* Primary Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Productivity Trend */}
-        <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 h-[400px]">
-          <h3 className="text-sm font-bold text-slate-300 mb-8 uppercase tracking-widest flex items-center gap-2">
-            <div className="w-1 h-4 bg-blue-500 rounded-full"></div> Activity Trend
-          </h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.completionTrend}>
+        <PaginatedChart
+          title="Activity Trend"
+          accentColor="blue"
+          data={stats.completionTrend}
+          pageSize={14}
+          renderChart={(pageData, pageKey) => (
+            <ResponsiveContainer width="100%" height="100%" key={pageKey}>
+              <AreaChart data={pageData}>
                 <defs>
                   <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -192,17 +250,19 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
                 <Line name="Avg Performance" type="monotone" dataKey="avgRating" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
+          )}
+        />
 
         {/* Day Efficiency */}
-        <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 h-[400px]">
-          <h3 className="text-sm font-bold text-slate-300 mb-8 uppercase tracking-widest flex items-center gap-2">
-            <div className="w-1 h-4 bg-violet-500 rounded-full"></div> Day Efficiency
-          </h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.completionTrend}>
+        <PaginatedChart
+          title="Day Efficiency"
+          accentColor="violet"
+          data={stats.completionTrend}
+          pageSize={14}
+          subtitle="Percentage of assigned tasks completed per day."
+          renderChart={(pageData, pageKey) => (
+            <ResponsiveContainer width="100%" height="100%" key={pageKey}>
+              <AreaChart data={pageData}>
                 <defs>
                   <linearGradient id="colorEfficiency" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.4} />
@@ -221,9 +281,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
                 <Area name="Efficiency (%)" type="monotone" dataKey="efficiency" stroke="#a78bfa" fillOpacity={1} fill="url(#colorEfficiency)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-          <p className="text-[10px] text-slate-500 mt-4 text-center">Percentage of assigned tasks completed per day.</p>
-        </div>
+          )}
+        />
       </div>
 
       {/* Secondary Row */}

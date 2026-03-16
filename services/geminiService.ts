@@ -38,29 +38,6 @@ export const geminiService = {
     }
   },
 
-  // Cache daily inspiration locally (one call per day)
-  getDailyInspiration: async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const cached = localStorage.getItem('dailyInspirationCache');
-      const cacheDay = localStorage.getItem('dailyInspirationTime');
-      if (cached && cacheDay === today) return cached;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: 'Generate a one-sentence daily productivity mission for a personal planner. Keep it under 15 words.',
-        config: { temperature: 0.4 }
-      });
-      const text = response && response.text ? response.text.trim() : 'Make today count.';
-      localStorage.setItem('dailyInspirationCache', text);
-      localStorage.setItem('dailyInspirationTime', today);
-      return text;
-    } catch (e) {
-      console.error('getDailyInspiration error:', e);
-      return 'Make today count.';
-    }
-  },
-
   // Use local canned responses to avoid frequent API calls for small chats
   getChatResponse: async (message: string, currentTasks: any[]) => {
     const canned = [
@@ -72,33 +49,5 @@ export const geminiService = {
       "Love the ambition. What's the first step?"
     ];
     return canned[Math.floor(Math.random() * canned.length)];
-  },
-
-  // Generate a new daily mission on demand (limit 3 per day)
-  generateDailyMission: async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const usageKey = `dailyMissionUsage_${today}`;
-      const count = parseInt(localStorage.getItem(usageKey) || '0', 10);
-
-      if (count >= 3) {
-        throw new Error("Daily mission generation limit reached (3/3).");
-      }
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: 'Generate exactly ONE inspirational, deep, optimistic, and thought-provoking philosophical quote from a famous author or philosopher. The quote must be short (under 20 words). Format the output exactly as: "Quote text here." - Author Name. Do NOT return a list or extra text.',
-        config: { temperature: 0.6 }
-      });
-      const text = response && response.text ? response.text.trim().replace(/"/g, '') : 'Fulfill your duty with goodness.';
-
-      localStorage.setItem(usageKey, (count + 1).toString());
-      localStorage.setItem('dailyInspirationCache', text);
-      localStorage.setItem('dailyInspirationTime', today);
-      return text;
-    } catch (e) {
-      console.error('generateDailyMission error:', e);
-      throw e;
-    }
   }
 };

@@ -8,6 +8,7 @@ import TaskCard from './components/TaskCard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import CalendarPicker from './components/CalendarPicker';
 import NotesTaker from './components/NotesTaker';
+import { getNextQuote } from './data/quotes';
 
 const App: React.FC = () => {
   const [state, setState] = useState<PlannerState>({
@@ -86,19 +87,13 @@ const App: React.FC = () => {
     // ✅ Mark hydration complete immediately
     hasHydratedRef.current = true;
 
-    // Fetch Gemini inspiration only if none exists
+    // Fetch a static quote if none exists
     if (!saved.dailyMission) {
-      (async () => {
-        try {
-          const prompt = await geminiService.getDailyInspiration();
-          setState(prev => ({
-            ...prev,
-            dailyMission: prompt?.replace(/"/g, '') || 'Make today count.'
-          }));
-        } catch {
-          setState(prev => ({ ...prev, dailyMission: 'Seize the day.' }));
-        }
-      })();
+      const quote = getNextQuote();
+      setState(prev => ({
+        ...prev,
+        dailyMission: `${quote.text} - ${quote.author}`
+      }));
     }
 
     // Ctrl+Q handler
@@ -290,16 +285,9 @@ const App: React.FC = () => {
      ========================= */
   const [isGeneratingMission, setIsGeneratingMission] = useState(false);
 
-  const handleGenerateMission = async () => {
-    setIsGeneratingMission(true);
-    try {
-      const newMission = await geminiService.generateDailyMission();
-      setState(prev => ({ ...prev, dailyMission: newMission }));
-    } catch (error: any) {
-      alert(error.message || "Failed to generate mission.");
-    } finally {
-      setIsGeneratingMission(false);
-    }
+  const handleGenerateMission = () => {
+    const quote = getNextQuote();
+    setState(prev => ({ ...prev, dailyMission: `${quote.text} - ${quote.author}` }));
   };
 
   const startEditingMission = () => {
@@ -505,12 +493,11 @@ const App: React.FC = () => {
                           <div className="flex gap-3">
                             <button
                               onClick={handleGenerateMission}
-                              disabled={isGeneratingMission}
-                              className={`text-[10px] uppercase tracking-widest font-bold transition-colors flex items-center gap-1 ${isGeneratingMission ? 'text-slate-600 cursor-not-allowed' : 'text-slate-500 hover:text-blue-400'}`}
-                              title="Generate new mission (Max 3/day)"
+                              className="text-[10px] uppercase tracking-widest font-bold transition-colors flex items-center gap-1 text-slate-500 hover:text-blue-400"
+                              title="Get a new quote"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isGeneratingMission ? "animate-spin" : ""}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
-                              <span>Generate</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
+                              <span>New Quote</span>
                             </button>
                             <button
                               onClick={startEditingMission}
@@ -749,6 +736,7 @@ const App: React.FC = () => {
             <div className="h-[calc(100vh-12rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
               <NotesTaker
                 notes={state.notes || []}
+                selectedDate={selectedDate}
                 onAddNote={handleAddNote}
                 onUpdateNote={handleUpdateNote}
                 onDeleteNote={handleDeleteNote}

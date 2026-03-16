@@ -13,11 +13,22 @@ export interface Task {
   date: string; // YYYY-MM-DD
 }
 
+export interface DraggableImage {
+  id: string;
+  dataUrl: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface Note {
   id: string;
   text: string;
   isCustomHtml?: boolean; // If it contains custom formatted text like bold/italic or images
   createdAt: string;
+  date?: string; // YYYY-MM-DD
+  images?: DraggableImage[];
 }
 
 export interface PlannerState {
