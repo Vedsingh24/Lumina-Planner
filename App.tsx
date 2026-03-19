@@ -8,9 +8,49 @@ import TaskCard from './components/TaskCard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import CalendarPicker from './components/CalendarPicker';
 import NotesTaker from './components/NotesTaker';
+import Confetti from './components/Confetti';
 import { getNextQuote } from './data/quotes';
 
+/* =========================
+   Best-Day Confetti Logic
+
+   TESTING MODE: showConfetti starts TRUE so you can approve the animation.
+   Once approved, change the line below to the commented-out "best-day" version.
+   ========================= */
+const BEST_DAY_KEY = 'lumina_best_day_record'; // { count: number, date: string }
+const CONFETTI_SHOWN_KEY = 'lumina_confetti_shown_date';
+
+function checkAndUpdateBestDay(allTasks: Task[]): boolean {
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  // Avoid showing more than once per calendar day
+  const alreadyShown = localStorage.getItem(CONFETTI_SHOWN_KEY);
+  if (alreadyShown === today) return false;
+
+  // Count completed tasks for yesterday
+  const yesterdayDone = allTasks.filter(t => t.date === yesterday && t.completed).length;
+  if (yesterdayDone === 0) return false;
+
+  // Load previous best
+  const rawBest = localStorage.getItem(BEST_DAY_KEY);
+  const best: { count: number } = rawBest ? JSON.parse(rawBest) : { count: 0 };
+
+  if (yesterdayDone > best.count) {
+    // New record!
+    localStorage.setItem(BEST_DAY_KEY, JSON.stringify({ count: yesterdayDone, date: yesterday }));
+    localStorage.setItem(CONFETTI_SHOWN_KEY, today);
+    return true;
+  }
+  return false;
+}
+
 const App: React.FC = () => {
+  // 🎉 Confetti: set to `true` always for testing; swap to best-day logic once approved
+  // TESTING: always true ↓
+  const [showConfetti, setShowConfetti] = useState(true);
+  // PRODUCTION (best-day gate): uncomment the line below and remove the line above
+  // const [showConfetti, setShowConfetti] = useState(false);
   const [state, setState] = useState<PlannerState>({
     tasks: [],
     userName: 'User',
@@ -26,6 +66,14 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
+
+  // Reset scroll to top whenever Insights tab is opened
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [activeTab]);
+
   const [isEditingMission, setIsEditingMission] = useState(false);
   const [tempMission, setTempMission] = useState('');
 
@@ -412,6 +460,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
+      {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/10 rounded-full blur-[120px]"></div>

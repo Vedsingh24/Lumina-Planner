@@ -154,14 +154,61 @@ const NotesTaker: React.FC<NotesTakerProps> = ({ notes, selectedDate, onAddNote,
     return { __html: html };
   };
 
-  // Patrick Hand — realistic non-cursive handwriting
+  // Dancing Script — stylized, beautiful cursive font
   const handwrittenStyle: React.CSSProperties = {
-    fontFamily: '"Patrick Hand", "Kalam", cursive',
-    color: '#93c5fd', // Soft blue ink on dark background
-    lineHeight: '2.2',
-    letterSpacing: '0.02em',
-    fontSize: '1.2rem',
+    fontFamily: '"Dancing Script", cursive',
+    color: '#38bdf8', // Bright sky blue — vivid and lively
+    lineHeight: '2.0',
+    letterSpacing: '0.04em',
+    fontSize: '1.4rem',
   };
+
+  // --- Bullet Handling ---
+  const insertBullet = () => {
+    const textarea = document.getElementById('note-editor') as HTMLTextAreaElement;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const currentText = textarea.value;
+    // Determine if we need a newline before the bullet
+    const prevChar = start > 0 ? currentText[start - 1] : '\n';
+    const prefix = prevChar === '\n' || start === 0 ? '• ' : '\n• ';
+    const newText = currentText.substring(0, start) + prefix + currentText.substring(start);
+    setText(newText);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+    }, 0);
+  };
+
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter') return;
+    const textarea = e.currentTarget;
+    const pos = textarea.selectionStart;
+    const val = textarea.value;
+    // Find start of current line
+    const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+    const currentLine = val.substring(lineStart, pos);
+    if (currentLine.startsWith('• ')) {
+      e.preventDefault();
+      const before = val.substring(0, pos);
+      const after = val.substring(pos);
+      const newText = before + '\n• ' + after;
+      setText(newText);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(pos + 3, pos + 3);
+      }, 0);
+    }
+  };
+
+  // --- Preview Pagination ---
+  const LINES_PER_PAGE = 60;
+  const [previewPage, setPreviewPage] = useState(0);
+  const textLines = text.split('\n');
+  const totalPreviewPages = Math.max(1, Math.ceil(textLines.length / LINES_PER_PAGE));
+  const pageStart = previewPage * LINES_PER_PAGE;
+  const pageEnd = pageStart + LINES_PER_PAGE;
+  const pageText = textLines.slice(pageStart, pageEnd).join('\n');
 
   // --- Export Logic ---
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -237,9 +284,14 @@ const NotesTaker: React.FC<NotesTakerProps> = ({ notes, selectedDate, onAddNote,
         {/* Left Pane: Raw Editor */}
         <div className="w-full md:w-1/2 flex flex-col border-r border-white/5 bg-slate-900/60 relative z-10">
           {/* Formatting Toolbar */}
-          <div className="flex items-center gap-1 p-2 border-b border-white/5 bg-slate-900/80">
+          <div className="flex items-center gap-1 p-2 border-b border-white/5 bg-slate-900/80 flex-wrap">
             <button onClick={() => insertFormatting('**', '**')} className="p-2 hover:bg-white/10 rounded-md text-slate-300 transition-colors" title="Bold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg></button>
             <button onClick={() => insertFormatting('*', '*')} className="p-2 hover:bg-white/10 rounded-md text-slate-300 transition-colors" title="Italic"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg></button>
+            <button
+              onClick={insertBullet}
+              className="px-2 py-1 text-sm font-bold text-sky-400 hover:bg-white/5 rounded-md transition-colors"
+              title="Insert Bullet Point"
+            >• Bullet</button>
             <div className="w-px h-4 bg-white/10 mx-1"></div>
             <button onClick={() => insertFormatting('[color:red]', '[/color]')} className="px-2 py-1 text-xs font-bold text-red-400 hover:bg-white/5 rounded-md transition-colors" title="Red Text">Red</button>
             <button onClick={() => insertFormatting('[color:green]', '[/color]')} className="px-2 py-1 text-xs font-bold text-green-400 hover:bg-white/5 rounded-md transition-colors" title="Green Text">Grn</button>
@@ -250,8 +302,9 @@ const NotesTaker: React.FC<NotesTakerProps> = ({ notes, selectedDate, onAddNote,
             id="note-editor"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Write your soul into the paper here... Supports: **bold**, *italic*, [color:red]colored[/color]"
-            className="flex-1 bg-transparent p-6 outline-none text-slate-300 resize-none font-mono text-sm leading-relaxed placeholder:text-slate-600 custom-scrollbar"
+            onKeyDown={handleEditorKeyDown}
+            placeholder="Write here... Supports: **bold**, *italic*, [color:red]colored[/color], • bullets"
+            className="flex-1 bg-transparent p-6 outline-none text-slate-300 resize-none font-mono text-sm leading-relaxed placeholder:text-slate-600 custom-scrollbar whitespace-pre-wrap break-words overflow-x-hidden"
             spellCheck={false}
           />
         </div>
@@ -271,13 +324,33 @@ const NotesTaker: React.FC<NotesTakerProps> = ({ notes, selectedDate, onAddNote,
             </button>
           </div>
 
-          {/* Handwritten Document Area (no paper lines) */}
-          <div className="flex-1 overflow-y-auto p-10 pt-16 relative custom-scrollbar">
-            <div 
-              className="relative z-10 min-h-full"
-              style={handwrittenStyle}
-              dangerouslySetInnerHTML={parseTextToHtml(text)}
-            />
+          {/* Handwritten Document Area — Word-like Pages */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 relative custom-scrollbar bg-slate-950 flex flex-col items-center gap-8">
+            {totalPreviewPages === 0 ? (
+                <div 
+                  className="w-full max-w-2xl bg-[#0f172a] shadow-2xl border border-white/5 relative flex-shrink-0"
+                  style={{ minHeight: '840px', padding: '40px 60px' }}
+                />
+            ) : (
+              Array.from({ length: totalPreviewPages }).map((_, idx) => {
+                const pStart = idx * LINES_PER_PAGE;
+                const pEnd = pStart + LINES_PER_PAGE;
+                const chunk = textLines.slice(pStart, pEnd).join('\n');
+                return (
+                  <div 
+                    key={idx}
+                    className="w-full max-w-2xl bg-[#0f172a] shadow-2xl border border-white/5 relative flex-shrink-0 transition-all duration-300"
+                    style={{ minHeight: '840px', padding: '40px 60px' }}
+                  >
+                    <div 
+                      className="relative z-10 w-full whitespace-pre-wrap break-words"
+                      style={handwrittenStyle}
+                      dangerouslySetInnerHTML={parseTextToHtml(chunk)}
+                    />
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Render Overlay Images */}
