@@ -40,7 +40,8 @@ export const storageService = {
             tasks: res.tasks || [],
             userName: res.userName || 'User',
             dailyMission: res.dailyMission || '',
-            chatHistory: res.chatHistory || {}
+            chatHistory: res.chatHistory || {},
+            notes: res.notes || []
           };
         }
       } catch (e) {
@@ -57,14 +58,16 @@ export const storageService = {
         tasks: parsed.tasks || [],
         userName: parsed.userName || 'User',
         dailyMission: parsed.dailyMission || '',
-        chatHistory: parsed.chatHistory || {}
+        chatHistory: parsed.chatHistory || {},
+        notes: parsed.notes || []
       };
     }
     return {
       tasks: [],
       userName: 'User',
       dailyMission: '',
-      chatHistory: {}
+      chatHistory: {},
+      notes: []
     };
   },
 

@@ -44,7 +44,14 @@ function initDB(userDataPath) {
       content TEXT,
       timestamp TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_chat_date ON chat_history(date);
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY,
+      date TEXT,
+      text TEXT,
+      images TEXT,
+      createdAt TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_notes_date ON notes(date);
   `);
 
     // Check for legacy JSON data and migrate if needed
@@ -170,7 +177,11 @@ function loadState() {
             tasks: tasks || [],
             userName: settingsMap.userName || 'User',
             dailyMission: settingsMap.dailyMission || '',
-            chatHistory: chatHistory || {}
+            chatHistory: chatHistory || {},
+            notes: (db.prepare('SELECT * FROM notes').all() || []).map(n => ({
+                ...n,
+                images: JSON.parse(n.images || '[]')
+            }))
         };
     } catch (error) {
         console.error('Error loading state from DB:', error);
@@ -259,6 +270,32 @@ function saveState(state) {
                         timestamp: msg.timestamp
                     });
                 }
+            }
+
+            // 4. Save Notes
+            const existingNoteIds = db.prepare('SELECT id FROM notes').all().map(n => n.id);
+            const newNoteIds = new Set((state.notes || []).map(n => n.id));
+
+            // Delete removed notes
+            const deleteNoteStmt = db.prepare('DELETE FROM notes WHERE id = ?');
+            existingNoteIds.forEach(id => {
+                if (!newNoteIds.has(id)) deleteNoteStmt.run(id);
+            });
+
+            // Upsert current notes
+            const upsertNote = db.prepare(`
+                INSERT OR REPLACE INTO notes (id, date, text, images, createdAt)
+                VALUES (@id, @date, @text, @images, @createdAt)
+            `);
+
+            for (const note of (state.notes || [])) {
+                upsertNote.run({
+                    id: note.id,
+                    date: note.date,
+                    text: note.text,
+                    images: JSON.stringify(note.images || []),
+                    createdAt: note.createdAt
+                });
             }
         });
 

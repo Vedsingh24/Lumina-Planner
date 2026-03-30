@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -70,6 +70,48 @@ function createWindow() {
 // Handle quit message from renderer process
 ipcMain.on('quit-app', () => {
   app.quit();
+});
+
+// Handle PDF export silently
+ipcMain.handle('export-to-pdf', async (event, htmlContent) => {
+  let printWin = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  try {
+    await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+    
+    // Give it a tiny moment to parse fonts
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const pdfBuffer = await printWin.webContents.printToPDF({
+      printBackground: true,
+      margins: { marginType: 'none' }
+    });
+
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Save PDF',
+      defaultPath: path.join(app.getPath('documents'), 'Lumina_Journal_Export.pdf'),
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+    });
+
+    if (canceled || !filePath) {
+      printWin.close();
+      return false;
+    }
+
+    fs.writeFileSync(filePath, pdfBuffer);
+    printWin.close();
+    return true;
+  } catch (error) {
+    console.error('PDF Export Error:', error);
+    if (printWin && !printWin.isDestroyed()) printWin.close();
+    return false;
+  }
 });
 
 app.whenReady().then(createWindow);

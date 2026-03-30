@@ -21,12 +21,7 @@ const BEST_DAY_KEY = 'lumina_best_day_record'; // { count: number, date: string 
 const CONFETTI_SHOWN_KEY = 'lumina_confetti_shown_date';
 
 function checkAndUpdateBestDay(allTasks: Task[]): boolean {
-  const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-  // Avoid showing more than once per calendar day
-  const alreadyShown = localStorage.getItem(CONFETTI_SHOWN_KEY);
-  if (alreadyShown === today) return false;
 
   // Count completed tasks for yesterday
   const yesterdayDone = allTasks.filter(t => t.date === yesterday && t.completed).length;
@@ -34,23 +29,42 @@ function checkAndUpdateBestDay(allTasks: Task[]): boolean {
 
   // Load previous best
   const rawBest = localStorage.getItem(BEST_DAY_KEY);
-  const best: { count: number } = rawBest ? JSON.parse(rawBest) : { count: 0 };
+  const best: { count: number, date?: string } = rawBest ? JSON.parse(rawBest) : { count: 0 };
 
+  // Show if it's a new record
   if (yesterdayDone > best.count) {
-    // New record!
-    localStorage.setItem(BEST_DAY_KEY, JSON.stringify({ count: yesterdayDone, date: yesterday }));
-    localStorage.setItem(CONFETTI_SHOWN_KEY, today);
     return true;
   }
+  
+  // Also show on every subsequent launch TODAY if yesterday was the record-breaking day
+  if (best.date === yesterday && yesterdayDone === best.count) {
+    return true; 
+  }
+
   return false;
 }
 
 const App: React.FC = () => {
-  // 🎉 Confetti: set to `true` always for testing; swap to best-day logic once approved
-  // TESTING: always true ↓
-  const [showConfetti, setShowConfetti] = useState(true);
-  // PRODUCTION (best-day gate): uncomment the line below and remove the line above
-  // const [showConfetti, setShowConfetti] = useState(false);
+  // 🎉 Confetti: Best-day logic enabled
+  const [showConfetti, setShowConfetti] = useState(() => checkAndUpdateBestDay(storageService.loadState().tasks));
+  
+  // Save the new record securely after initial render
+  useEffect(() => {
+    if (showConfetti) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const allTasks = storageService.loadState().tasks;
+      const yesterdayDone = allTasks.filter(t => t.date === yesterday && t.completed).length;
+      
+      const rawBest = localStorage.getItem(BEST_DAY_KEY);
+      const best: { count: number } = rawBest ? JSON.parse(rawBest) : { count: 0 };
+
+      // Only write to localStorage if it's genuinely a new high score
+      if (yesterdayDone > best.count) {
+        localStorage.setItem(BEST_DAY_KEY, JSON.stringify({ count: yesterdayDone, date: yesterday }));
+      }
+    }
+  }, [showConfetti]);
+
   const [state, setState] = useState<PlannerState>({
     tasks: [],
     userName: 'User',
@@ -533,7 +547,7 @@ const App: React.FC = () => {
                 <div className="relative p-8 border border-white/5 glass-panel">
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-blue-500/20 rounded-2xl text-blue-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
@@ -786,6 +800,7 @@ const App: React.FC = () => {
               <NotesTaker
                 notes={state.notes || []}
                 selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
                 onAddNote={handleAddNote}
                 onUpdateNote={handleUpdateNote}
                 onDeleteNote={handleDeleteNote}
@@ -807,7 +822,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="mt-auto py-12 border-t border-white/5 text-center">
+      <footer className="mt-6 py-4 border-t border-white/5 text-center">
         <div className="flex items-center justify-center gap-6 mb-4">
           <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/10"></div>
           <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">Lumina Core v1.3</span>

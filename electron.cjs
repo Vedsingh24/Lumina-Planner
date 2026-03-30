@@ -100,6 +100,40 @@ app.whenReady().then(() => {
     app.quit();
   });
 
+  ipcMain.handle('export-to-pdf', async (event, htmlContent) => {
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    const { dialog } = require('electron');
+    const fs = require('fs');
+
+    const { filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export Journal as PDF',
+      defaultPath: path.join(app.getPath('documents'), `Lumina_Journal_${new Date().toISOString().split('T')[0]}.pdf`),
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+    });
+
+    if (!filePath) return false;
+
+    // Create a hidden window to render the PDF
+    const printWin = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: true } });
+    await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+    
+    try {
+      const data = await printWin.webContents.printToPDF({
+        marginsType: 0,
+        pageSize: 'A4',
+        printBackground: true,
+        landscape: false
+      });
+      fs.writeFileSync(filePath, data);
+      printWin.close();
+      return true;
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+      printWin.close();
+      return false;
+    }
+  });
+
   createWindow();
 
   app.on('activate', function () {
