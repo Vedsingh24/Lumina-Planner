@@ -22,6 +22,7 @@ describe('storageService', () => {
             userName: 'User',
             dailyMission: '',
             chatHistory: {},
+            notes: []
         });
     });
 

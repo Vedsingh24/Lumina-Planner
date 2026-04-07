@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ─── Google Fonts ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Dancing+Script:wght@400..700&family=Inter:wght@300;400;500;600;700;800;900&family=Kalam:wght@300;400;700&family=Patrick+Hand&display=swap');
+
+/* ─── Base Styles ──────────────────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #020617;
+  color: #f8fafc;
+  margin: 0;
+  overflow-x: hidden;
+  /* Fluid base font for responsive scaling */
+  font-size: clamp(14px, 0.9vw, 16px);
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+/* ─── Glass Panel ──────────────────────────────────────────────────────────── */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* ─── Responsive spacing for large screens ─────────────────────────────────── */
+@media (min-width: 1600px) {
+  body {
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 1920px) {
+  body {
+    font-size: 17px;
+  }
+}
+
+/* ─── Offline Banner Animation ─────────────────────────────────────────────── */
+@keyframes offline-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.offline-banner {
+  animation: offline-pulse 3s ease-in-out infinite;
+}

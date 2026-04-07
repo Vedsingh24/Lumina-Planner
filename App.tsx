@@ -48,6 +48,19 @@ const App: React.FC = () => {
   // 🎉 Confetti: Best-day logic enabled
   const [showConfetti, setShowConfetti] = useState(() => checkAndUpdateBestDay(storageService.loadState().tasks));
   
+  // 🌐 Offline detection
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
+
   // Save the new record securely after initial render
   useEffect(() => {
     if (showConfetti) {
@@ -144,6 +157,37 @@ const App: React.FC = () => {
      ========================= */
   useEffect(() => {
     const saved = storageService.loadState();
+
+    // ♻️ Recurring task hydration — clone recurring tasks to today if not already present
+    const today = new Date().toISOString().split('T')[0];
+    const recurringSourceTasks = saved.tasks.filter(t => t.isRecurring);
+    const todaysTaskSourceIds = new Set(
+      saved.tasks.filter(t => t.date === today).map(t => t.recurringSourceId).filter(Boolean)
+    );
+    // Also check if the source itself is already on today (it's possible the original task is today's task)
+    const todaysTaskIds = new Set(saved.tasks.filter(t => t.date === today).map(t => t.id));
+    const newClones: typeof saved.tasks = [];
+    for (const source of recurringSourceTasks) {
+      // Don't clone if today already has a copy of this source, or if the source IS today's task
+      if (todaysTaskSourceIds.has(source.id) || (source.date === today && todaysTaskIds.has(source.id))) continue;
+      newClones.push({
+        id: crypto.randomUUID(),
+        title: source.title,
+        description: source.description,
+        category: source.category,
+        priority: source.priority,
+        completed: false,
+        rating: null,
+        createdAt: new Date().toISOString(),
+        date: today,
+        isRecurring: true,
+        recurringSourceId: source.id
+      });
+    }
+    if (newClones.length > 0) {
+      saved.tasks = [...newClones, ...saved.tasks];
+    }
+
     setState(saved);
 
     // ✅ Mark hydration complete immediately
@@ -289,6 +333,33 @@ const App: React.FC = () => {
       ...prev,
       tasks: prev.tasks.filter(t => t.id !== id)
     }));
+  };
+
+  /* =========================
+     Recurring Task Toggle
+     ========================= */
+  const handleToggleRecurring = (id: string) => {
+    setState(prev => {
+      const task = prev.tasks.find(t => t.id === id);
+      if (!task) return prev;
+      const newRecurring = !task.isRecurring;
+      
+      // Determine the source ID (this task might be a clone)
+      const sourceId = task.recurringSourceId || task.id;
+      
+      return {
+        ...prev,
+        tasks: prev.tasks.map(t => {
+          // Update the clicked task
+          if (t.id === id) return { ...t, isRecurring: newRecurring };
+          // Also update the source task if this was a clone
+          if (t.id === sourceId) return { ...t, isRecurring: newRecurring };
+          // Also update other clones that share the same source
+          if (t.recurringSourceId === sourceId) return { ...t, isRecurring: newRecurring };
+          return t;
+        })
+      };
+    });
   };
 
   const handleMergeTask = (id: string) => {
@@ -475,6 +546,13 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="offline-banner sticky top-0 z-[100] bg-amber-500/10 border-b border-amber-500/30 px-6 py-2 flex items-center justify-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+          <span className="text-xs font-semibold text-amber-300">You're offline — AI features are unavailable. Your tasks and notes are saved locally.</span>
+        </div>
+      )}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/10 rounded-full blur-[120px]"></div>
@@ -538,7 +616,7 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
+      <main className="flex-1 max-w-[1600px] mx-auto w-full p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className={`${activeTab === 'board' ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-8`}>
           {activeTab === 'board' ? (
             <>
@@ -770,6 +848,7 @@ const App: React.FC = () => {
                           onDelete={deleteTask}
                           onUpdate={updateTask}
                           onMerge={handleMergeTask}
+                          onToggleRecurring={handleToggleRecurring}
                           isFirst={index === 0}
                           isLast={index === filteredTasks.length - 1}
                         />
@@ -788,7 +867,7 @@ const App: React.FC = () => {
               </div>
             </>
           ) : activeTab === 'analytics' ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="mb-10">
                 <h2 className="text-4xl font-black text-white tracking-tight mb-2">Your Velocity</h2>
                 <p className="text-slate-500 text-lg">Visualizing your progress over the last few weeks.</p>
@@ -796,7 +875,7 @@ const App: React.FC = () => {
               <AnalyticsDashboard tasks={state.tasks} />
             </div>
           ) : (
-            <div className="h-[calc(100vh-12rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="h-[calc(100vh-8rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
               <NotesTaker
                 notes={state.notes || []}
                 selectedDate={selectedDate}

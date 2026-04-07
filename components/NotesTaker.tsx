@@ -169,6 +169,7 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
       ['bold', 'italic', 'underline', 'strike'],
       [{ 'color': [] }, { 'background': [] }],
       [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+      [{ 'indent': '-1' }, { 'indent': '+1' }],
       ['clean']
     ],
   };
@@ -268,11 +269,11 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#020617] relative animate-in fade-in duration-500 rounded-3xl border border-white/5 overflow-hidden">
+    <div className="flex flex-col h-full bg-[#020617] relative animate-in fade-in duration-500 rounded-2xl border border-white/5 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center p-4 border-b border-white/5 glass-panel z-10">
+      <div className="flex justify-between items-center px-4 py-2 border-b border-white/5 glass-panel z-10">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Daily Journal</h2>
+          <h2 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Daily Journal</h2>
           <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-xs font-bold tracking-widest text-blue-400 uppercase">{selectedDate}</span>
         </div>
         <div className="flex items-center gap-3">
@@ -294,8 +295,8 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
 
       <div className="flex-1 flex min-h-0 relative">
         {/* Sidebar */}
-        <div className="w-44 border-r border-white/5 bg-slate-900/40 flex flex-col overflow-hidden">
-          <div className="p-3 border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">History</div>
+        <div className="w-36 lg:w-44 border-r border-white/5 bg-slate-900/40 flex flex-col overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">History</div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             {availableDates.length === 0 ? (
               <div className="text-[10px] text-slate-600 p-2 italic">No notes yet</div>
@@ -336,7 +337,7 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
           <div className="w-full md:w-1/2 bg-slate-950 relative overflow-hidden flex flex-col">
 
             {/* Image button */}
-            <div className="absolute top-0 w-full h-12 flex items-center justify-end px-4 z-20 pointer-events-none">
+            <div className="absolute top-0 w-full h-10 flex items-center justify-end px-4 z-20 pointer-events-none">
               <button
                 onClick={addOverlayImage}
                 className="pointer-events-auto px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded transition-colors flex items-center gap-1.5 text-xs font-black uppercase tracking-widest border border-blue-500/20 backdrop-blur-sm"
@@ -371,7 +372,7 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
             />
 
             {/* Scrollable pages container */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar pt-14 pb-8 px-6 bg-slate-950 flex flex-col items-center gap-8">
+            <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar pt-12 pb-4 px-6 bg-slate-950 flex flex-col items-center gap-8">
               {pages.map((pageIdx) => {
                 const isFirst = pageIdx === 0;
                 const contentH = isFirst ? PAGE1_CONTENT_H : PAGEN_CONTENT_H;
@@ -541,15 +542,132 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-        .quill-container .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(15,23,42,0.8); padding: 8px; }
+        /* ─── Quill Toolbar ─────────────────────────────────────────────── */
+        .quill-container .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(15,23,42,0.8); padding: 4px 8px; }
         .quill-container .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; overflow-x: hidden; font-family: 'Inter', sans-serif; font-size: 0.9rem; color: #cbd5e1; }
         .quill-container .ql-editor { padding: 24px; min-height: 100%; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap; }
         .quill-container .ql-editor.ql-blank::before { color: #475569; font-style: normal; }
         .quill-container .ql-snow .ql-stroke { stroke: #94a3b8; }
         .quill-container .ql-snow .ql-fill { fill: #94a3b8; }
         .quill-container .ql-snow .ql-picker { color: #94a3b8; }
+        .quill-container .ql-snow .ql-picker-options { background: #0f172a; border-color: rgba(255,255,255,0.1); }
 
-        .preview-measure p, .preview-measure li, .preview-measure h1, .preview-measure h2, .preview-measure h3 {
+        /* ─── Editor: Headings ──────────────────────────────────────────── */
+        .quill-container .ql-editor h1 {
+          font-size: 2rem !important;
+          font-weight: 800 !important;
+          color: #f1f5f9 !important;
+          line-height: 1.3 !important;
+          margin-bottom: 0.5em !important;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          padding-bottom: 0.3em;
+        }
+        .quill-container .ql-editor h2 {
+          font-size: 1.5rem !important;
+          font-weight: 700 !important;
+          color: #e2e8f0 !important;
+          line-height: 1.4 !important;
+          margin-bottom: 0.4em !important;
+        }
+        .quill-container .ql-editor h3 {
+          font-size: 1.2rem !important;
+          font-weight: 600 !important;
+          color: #cbd5e1 !important;
+          line-height: 1.4 !important;
+          margin-bottom: 0.3em !important;
+        }
+
+        /* ─── Editor: Bold & Italic ─────────────────────────────────────── */
+        .quill-container .ql-editor strong,
+        .quill-container .ql-editor b {
+          font-weight: 800 !important;
+          color: #f8fafc !important;
+        }
+        .quill-container .ql-editor em,
+        .quill-container .ql-editor i {
+          font-style: italic !important;
+          color: #7dd3fc !important;
+        }
+
+        /* ─── Editor: Lists ─────────────────────────────────────────────── */
+        .quill-container .ql-editor ol,
+        .quill-container .ql-editor ul {
+          padding-left: 1.5em !important;
+          margin: 0.4em 0 !important;
+        }
+        .quill-container .ql-editor ul > li::before {
+          content: '\\2022' !important;
+          color: #3b82f6 !important;
+          font-weight: bold !important;
+          margin-right: 0.5em !important;
+        }
+        .quill-container .ql-editor ol > li {
+          list-style-type: decimal !important;
+          padding-left: 0.3em !important;
+        }
+        .quill-container .ql-editor li {
+          padding-left: 0.3em !important;
+        }
+
+        /* ─── Editor: Indent ────────────────────────────────────────────── */
+        .quill-container .ql-editor .ql-indent-1 { padding-left: 2em !important; }
+        .quill-container .ql-editor .ql-indent-2 { padding-left: 4em !important; }
+        .quill-container .ql-editor .ql-indent-3 { padding-left: 6em !important; }
+        .quill-container .ql-editor .ql-indent-4 { padding-left: 8em !important; }
+        .quill-container .ql-editor .ql-indent-5 { padding-left: 10em !important; }
+
+        /* ─── Preview: Headings ─────────────────────────────────────────── */
+        .preview-measure h1, div.ql-editor:not(.quill-container .ql-editor) h1 {
+          font-family: 'Dancing Script', cursive;
+          font-size: 2.2rem !important;
+          font-weight: 700 !important;
+          line-height: 1.5 !important;
+          margin-bottom: 0.3em;
+        }
+        .preview-measure h2, div.ql-editor:not(.quill-container .ql-editor) h2 {
+          font-family: 'Dancing Script', cursive;
+          font-size: 1.8rem !important;
+          font-weight: 700 !important;
+          line-height: 1.6 !important;
+          margin-bottom: 0.2em;
+        }
+        .preview-measure h3, div.ql-editor:not(.quill-container .ql-editor) h3 {
+          font-family: 'Dancing Script', cursive;
+          font-size: 1.6rem !important;
+          font-weight: 700 !important;
+          line-height: 1.7 !important;
+          margin-bottom: 0.2em;
+        }
+
+        /* ─── Preview: Bold & Italic ────────────────────────────────────── */
+        div.ql-editor:not(.quill-container .ql-editor) strong,
+        div.ql-editor:not(.quill-container .ql-editor) b {
+          font-weight: 700 !important;
+        }
+        div.ql-editor:not(.quill-container .ql-editor) em,
+        div.ql-editor:not(.quill-container .ql-editor) i {
+          font-style: italic !important;
+        }
+
+        /* ─── Preview: Lists ────────────────────────────────────────────── */
+        div.ql-editor:not(.quill-container .ql-editor) ol,
+        div.ql-editor:not(.quill-container .ql-editor) ul {
+          padding-left: 1.5em !important;
+        }
+        div.ql-editor:not(.quill-container .ql-editor) ul > li::before {
+          content: '\\2022' !important;
+          margin-right: 0.5em !important;
+        }
+        div.ql-editor:not(.quill-container .ql-editor) ol > li {
+          list-style-type: decimal !important;
+        }
+
+        /* ─── Preview: Indent ───────────────────────────────────────────── */
+        div.ql-editor:not(.quill-container .ql-editor) .ql-indent-1 { padding-left: 2em !important; }
+        div.ql-editor:not(.quill-container .ql-editor) .ql-indent-2 { padding-left: 4em !important; }
+        div.ql-editor:not(.quill-container .ql-editor) .ql-indent-3 { padding-left: 6em !important; }
+
+        .preview-measure p, .preview-measure li {
           font-family: 'Dancing Script', cursive;
           font-size: 1.4rem;
           line-height: 2.0;

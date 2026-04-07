@@ -8,7 +8,8 @@ interface TaskCardProps {
   onRate: (id: string, rating: number) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
-  onMerge?: (id: string) => void; // Optional merge handler
+  onMerge?: (id: string) => void;
+  onToggleRecurring?: (id: string) => void;
   activeDropdown?: 'priority' | 'category' | null;
   onSetActiveDropdown?: (type: 'priority' | 'category' | null) => void;
   isFirst?: boolean;
@@ -18,7 +19,7 @@ interface TaskCardProps {
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
 const CATEGORIES = ['General', 'Work', 'Personal', 'Health', 'Finance', 'Learning'];
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, onUpdate, onMerge, isFirst, isLast }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, onUpdate, onMerge, onToggleRecurring, isFirst, isLast }) => {
   const [activeDropdown, setActiveDropdown] = useState<'priority' | 'category' | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -176,7 +177,23 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
         </div>
 
         {!isEditing && (
-          <div className="flex flex-row gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1">
+          <div className={`flex flex-row gap-2 flex-shrink-0 mt-1 transition-opacity ${task.isRecurring ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+            {onToggleRecurring && (
+              <button
+                onClick={() => onToggleRecurring(task.id)}
+                aria-label={task.isRecurring ? "Remove recurring" : "Make recurring"}
+                title={task.isRecurring ? "This task repeats daily \u2014 click to stop" : "Repeat this task every day"}
+                className={`p-1.5 bg-slate-800/80 rounded-lg border transition-all active:translate-y-[2px] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] ${
+                  task.isRecurring
+                    ? 'text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10'
+                    : 'text-slate-500 hover:text-emerald-400 border-transparent hover:border-emerald-500/30'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z" />
+                </svg>
+              </button>
+            )}
             <button
               onClick={() => setIsEditing(true)}
               aria-label="Edit task"
