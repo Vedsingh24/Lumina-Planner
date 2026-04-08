@@ -177,7 +177,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
         </div>
 
         {!isEditing && (
-          <div className={`flex flex-row gap-2 flex-shrink-0 mt-1 transition-opacity ${task.isRecurring ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+          <div className="flex flex-row gap-2 flex-shrink-0 mt-1">
             {onToggleRecurring && (
               <button
                 onClick={() => onToggleRecurring(task.id)}
@@ -185,9 +185,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                 title={task.isRecurring ? "This task repeats daily \u2014 click to stop" : "Repeat this task every day"}
                 className={`p-1.5 bg-slate-800/80 rounded-lg border transition-all active:translate-y-[2px] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] ${
                   task.isRecurring
-                    ? 'text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10'
-                    : 'text-slate-500 hover:text-emerald-400 border-transparent hover:border-emerald-500/30'
-                }`}
+                    ? 'text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10 opacity-100'
+                    : 'text-slate-500 hover:text-emerald-400 border-transparent hover:border-emerald-500/30 opacity-0 group-hover:opacity-100'
+                } transition-opacity`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z" />
@@ -197,14 +197,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
             <button
               onClick={() => setIsEditing(true)}
               aria-label="Edit task"
-              className="p-1.5 text-slate-500 hover:text-blue-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-blue-500/30 transition-all"
+              className="p-1.5 text-slate-500 hover:text-blue-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-blue-500/30 transition-all opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
             </button>
             <button
               onClick={() => onDelete(task.id)}
               aria-label="Delete task"
-              className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-red-500/30 transition-all"
+              className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-red-500/30 transition-all opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>

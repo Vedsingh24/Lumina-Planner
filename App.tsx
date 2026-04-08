@@ -31,6 +31,9 @@ function checkAndUpdateBestDay(allTasks: Task[]): boolean {
   const rawBest = localStorage.getItem(BEST_DAY_KEY);
   const best: { count: number, date?: string } = rawBest ? JSON.parse(rawBest) : { count: 0 };
 
+  // Don't show confetti if there's no prior record — prevents celebration on the very first day
+  if (best.count === 0 && !best.date) return false;
+
   // Show if it's a new record
   if (yesterdayDone > best.count) {
     return true;
@@ -61,22 +64,22 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Save the new record securely after initial render
+  // Check and save a new productivity record after initial render, independent of whether confetti is shown
   useEffect(() => {
-    if (showConfetti) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      const allTasks = storageService.loadState().tasks;
-      const yesterdayDone = allTasks.filter(t => t.date === yesterday && t.completed).length;
-      
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const allTasks = storageService.loadState().tasks;
+    const yesterdayDone = allTasks.filter(t => t.date === yesterday && t.completed).length;
+    
+    if (yesterdayDone > 0) {
       const rawBest = localStorage.getItem(BEST_DAY_KEY);
       const best: { count: number } = rawBest ? JSON.parse(rawBest) : { count: 0 };
 
-      // Only write to localStorage if it's genuinely a new high score
+      // Record new high score if we improved, setting the baseline for future confetti
       if (yesterdayDone > best.count) {
         localStorage.setItem(BEST_DAY_KEY, JSON.stringify({ count: yesterdayDone, date: yesterday }));
       }
     }
-  }, [showConfetti]);
+  }, []);
 
   const [state, setState] = useState<PlannerState>({
     tasks: [],
@@ -546,13 +549,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
-      {/* Offline Banner */}
-      {isOffline && (
-        <div className="offline-banner sticky top-0 z-[100] bg-amber-500/10 border-b border-amber-500/30 px-6 py-2 flex items-center justify-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
-          <span className="text-xs font-semibold text-amber-300">You're offline — AI features are unavailable. Your tasks and notes are saved locally.</span>
-        </div>
-      )}
+
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/10 rounded-full blur-[120px]"></div>
@@ -896,6 +893,7 @@ const App: React.FC = () => {
               messages={currentChatMessages}
               onSendMessage={handleSendMessage}
               isLoading={isChatLoading}
+              isOffline={isOffline}
             />
           </div>
         )}
