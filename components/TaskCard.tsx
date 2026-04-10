@@ -24,6 +24,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description);
+  const [editStartTime, setEditStartTime] = useState(task.startTime || '');
+  const [editEndTime, setEditEndTime] = useState(task.endTime || '');
 
   const getPriorityColor = (p: Priority) => {
     switch (p) {
@@ -35,7 +37,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
   };
 
   const handleSaveEdit = () => {
-    onUpdate(task.id, { title: editTitle, description: editDesc });
+    onUpdate(task.id, { 
+      title: editTitle, 
+      description: editDesc,
+      startTime: editStartTime || undefined,
+      endTime: editEndTime || undefined 
+    });
     setIsEditing(false);
   };
 
@@ -154,13 +161,32 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                   className="bg-slate-900/50 border border-blue-500/30 rounded-lg px-3 py-2 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-blue-500 min-h-[60px] w-full resize-none"
                   placeholder="Task description"
                 />
-                <div className="flex justify-end gap-2 mt-1">
-                  <button onClick={() => {
-                    setIsEditing(false);
-                    setEditTitle(task.title);
-                    setEditDesc(task.description);
-                  }} className="px-3 py-1 rounded-md text-[10px] uppercase font-bold text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors">Cancel</button>
-                  <button onClick={handleSaveEdit} className="px-3 py-1 rounded-md text-[10px] uppercase font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors">Save</button>
+                <div className="flex justify-between items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg border border-blue-500/20">
+                    <input 
+                      type="time" 
+                      value={editStartTime} 
+                      onChange={e => setEditStartTime(e.target.value)}
+                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                    />
+                    <span className="text-slate-500 text-xs">-</span>
+                    <input 
+                      type="time" 
+                      value={editEndTime}
+                      onChange={e => setEditEndTime(e.target.value)}
+                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => {
+                      setIsEditing(false);
+                      setEditTitle(task.title);
+                      setEditDesc(task.description);
+                      setEditStartTime(task.startTime || '');
+                      setEditEndTime(task.endTime || '');
+                    }} className="px-3 py-1 rounded-md text-[10px] uppercase font-bold text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors">Cancel</button>
+                    <button onClick={handleSaveEdit} className="px-3 py-1 rounded-md text-[10px] uppercase font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors">Save</button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -177,37 +203,50 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
         </div>
 
         {!isEditing && (
-          <div className="flex flex-row gap-2 flex-shrink-0 mt-1">
-            {onToggleRecurring && (
+          <div className="flex flex-col items-end gap-2 flex-shrink-0 mt-1">
+            <div className="flex flex-row gap-2">
+              {onToggleRecurring && (
+                <button
+                  onClick={() => onToggleRecurring(task.id)}
+                  aria-label={task.isRecurring ? "Remove recurring" : "Make recurring"}
+                  title={task.isRecurring ? "This task repeats daily \u2014 click to stop" : "Repeat this task every day"}
+                  className={`p-1.5 bg-slate-800/80 rounded-lg border transition-all duration-300 ease-out active:scale-90 active:translate-y-[2px] active:shadow-[inset_0_3px_6px_rgba(0,0,0,0.6)] ${
+                    task.isRecurring
+                      ? 'text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10 opacity-100'
+                      : 'text-slate-500 hover:text-emerald-400 border-transparent hover:border-emerald-500/30 opacity-0 group-hover:opacity-100'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z" />
+                  </svg>
+                </button>
+              )}
               <button
-                onClick={() => onToggleRecurring(task.id)}
-                aria-label={task.isRecurring ? "Remove recurring" : "Make recurring"}
-                title={task.isRecurring ? "This task repeats daily \u2014 click to stop" : "Repeat this task every day"}
-                className={`p-1.5 bg-slate-800/80 rounded-lg border transition-all active:translate-y-[2px] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] ${
-                  task.isRecurring
-                    ? 'text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10 opacity-100'
-                    : 'text-slate-500 hover:text-emerald-400 border-transparent hover:border-emerald-500/30 opacity-0 group-hover:opacity-100'
-                } transition-opacity`}
+                onClick={() => setIsEditing(true)}
+                aria-label="Edit task"
+                className="p-1.5 text-slate-500 hover:text-blue-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-blue-500/30 transition-all opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
               </button>
+              <button
+                onClick={() => onDelete(task.id)}
+                aria-label="Delete task"
+                className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-red-500/30 transition-all opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+
+            {(task.startTime || task.endTime) && (
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-md text-blue-400 whitespace-nowrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span className="text-[10px] font-bold tracking-wider uppercase font-mono">
+                    {task.startTime || '?'} - {task.endTime || '?'}
+                  </span>
+                </div>
+              </div>
             )}
-            <button
-              onClick={() => setIsEditing(true)}
-              aria-label="Edit task"
-              className="p-1.5 text-slate-500 hover:text-blue-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-blue-500/30 transition-all opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-            </button>
-            <button
-              onClick={() => onDelete(task.id)}
-              aria-label="Delete task"
-              className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800/80 rounded-lg border border-transparent hover:border-red-500/30 transition-all opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
           </div>
         )}
       </div>

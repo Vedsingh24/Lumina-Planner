@@ -4,11 +4,12 @@ import { Task } from '../types';
 interface CalendarPickerProps {
     selectedDate: string;
     onSelectDate: (date: string) => void;
-    tasks: Task[];
+    tasks?: Task[];
+    highlightDates?: string[];
     onClose: () => void;
 }
 
-const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelectDate, tasks, onClose }) => {
+const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelectDate, tasks, highlightDates, onClose }) => {
     const [viewDate, setViewDate] = useState(new Date(selectedDate));
 
     const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -60,6 +61,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelectD
     };
 
     const getTaskStatusColor = (date: Date) => {
+        if (!tasks) return null;
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
@@ -72,8 +74,17 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelectD
         return hasPending ? 'bg-blue-500' : 'bg-green-500';
     };
 
+    const hasHighlight = (date: Date) => {
+        if (!highlightDates) return false;
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const iso = `${y}-${m}-${d}`;
+        return highlightDates.includes(iso);
+    };
+
     return (
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 p-4 bg-slate-900/95 border border-blue-500/20 rounded-2xl shadow-xl backdrop-blur-xl w-[320px] animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 p-4 border border-blue-500/20 rounded-2xl shadow-2xl w-[320px] animate-in fade-in zoom-in-95 duration-200" style={{ backgroundColor: '#0f172a' }}>
             <div className="flex items-center justify-between mb-4">
                 <button onClick={handlePrevMonth} className="p-1 hover:text-blue-400 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -103,6 +114,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelectD
                         date.getFullYear() === new Date(selectedDate).getFullYear();
 
                     const statusColor = getTaskStatusColor(date);
+                    const isHighlighted = hasHighlight(date);
 
                     return (
                         <button
@@ -112,8 +124,11 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDate, onSelectD
                                 }`}
                         >
                             {date.getDate()}
-                            {statusColor && !isSelected && (
-                                <div className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${statusColor}`}></div>
+                            {(statusColor || isHighlighted) && !isSelected && (
+                                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 items-center">
+                                    {statusColor && <div className={`w-1 h-1 rounded-full ${statusColor}`}></div>}
+                                    {isHighlighted && !statusColor && <div className={`w-1 h-1 rounded-full bg-slate-400`}></div>}
+                                </div>
                             )}
                         </button>
                     );

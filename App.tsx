@@ -8,6 +8,7 @@ import TaskCard from './components/TaskCard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import CalendarPicker from './components/CalendarPicker';
 import NotesTaker from './components/NotesTaker';
+import ScheduleBoard from './components/ScheduleBoard';
 import Confetti from './components/Confetti';
 import { getNextQuote } from './data/quotes';
 
@@ -91,7 +92,7 @@ const App: React.FC = () => {
 
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'board' | 'analytics' | 'notes'>('board');
+  const [activeTab, setActiveTab] = useState<'board' | 'schedule' | 'analytics' | 'notes'>('board');
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -163,16 +164,24 @@ const App: React.FC = () => {
 
     // ♻️ Recurring task hydration — clone recurring tasks to today if not already present
     const today = new Date().toISOString().split('T')[0];
-    const recurringSourceTasks = saved.tasks.filter(t => t.isRecurring);
-    const todaysTaskSourceIds = new Set(
-      saved.tasks.filter(t => t.date === today).map(t => t.recurringSourceId).filter(Boolean)
-    );
-    // Also check if the source itself is already on today (it's possible the original task is today's task)
-    const todaysTaskIds = new Set(saved.tasks.filter(t => t.date === today).map(t => t.id));
+    const todaysTasks = saved.tasks.filter(t => t.date === today);
+    const todaysFamilyIds = new Set(todaysTasks.map(t => t.recurringSourceId || t.id));
+
+    // Group recurring tasks into families
+    const recurringFamilies = new Map<string, Task>();
+    saved.tasks.forEach(t => {
+      if (t.isRecurring) {
+        const familyId = t.recurringSourceId || t.id;
+        // Prefer the original task if multiple are found, otherwise grab first we see
+        if (!recurringFamilies.has(familyId) || !t.recurringSourceId) {
+          recurringFamilies.set(familyId, t);
+        }
+      }
+    });
+
     const newClones: typeof saved.tasks = [];
-    for (const source of recurringSourceTasks) {
-      // Don't clone if today already has a copy of this source, or if the source IS today's task
-      if (todaysTaskSourceIds.has(source.id) || (source.date === today && todaysTaskIds.has(source.id))) continue;
+    recurringFamilies.forEach((source, familyId) => {
+      if (todaysFamilyIds.has(familyId)) return;
       newClones.push({
         id: crypto.randomUUID(),
         title: source.title,
@@ -184,9 +193,10 @@ const App: React.FC = () => {
         createdAt: new Date().toISOString(),
         date: today,
         isRecurring: true,
-        recurringSourceId: source.id
+        recurringSourceId: familyId
       });
-    }
+    });
+
     if (newClones.length > 0) {
       saved.tasks = [...newClones, ...saved.tasks];
     }
@@ -501,7 +511,11 @@ const App: React.FC = () => {
 
       if (newTasksData && newTasksData.length > 0) {
         handleTasksGenerated(newTasksData);
-        replyContent = `I've created ${newTasksData.length} new tasks for you. Check your board!`;
+        // Check if any of the tasks have start time set
+        const hasSchedule = newTasksData.some(t => t.startTime || t.endTime);
+        replyContent = hasSchedule 
+          ? `I've created ${newTasksData.length} new tasks and arranged your schedule for you! Check your board or schedule tab.`
+          : `I've created ${newTasksData.length} new tasks for you. Check your board!`;
       } else {
         // If no tasks were found, use the conversational fallback
         replyContent = await geminiService.getChatResponse(content, state.tasks);
@@ -576,6 +590,13 @@ const App: React.FC = () => {
                 }`}
             >
               My Board
+            </button>
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'schedule' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'
+                }`}
+            >
+              Schedule
             </button>
             <button
               onClick={() => setActiveTab('analytics')}
@@ -863,6 +884,20 @@ const App: React.FC = () => {
                 </Reorder.Group>
               </div>
             </>
+          ) : activeTab === 'schedule' ? (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-[calc(100vh-12rem)]">
+              <div className="mb-6 flex justify-between items-end">
+                <div>
+                  <h2 className="text-3xl font-black text-white tracking-tight mb-1">Time Sheet</h2>
+                  <p className="text-slate-500 text-sm">Drag to move, pull edges to resize. Shape your ideal day.</p>
+                </div>
+              </div>
+              <ScheduleBoard 
+                tasks={state.tasks} 
+                selectedDate={selectedDate} 
+                onUpdateTask={updateTask} 
+              />
+            </div>
           ) : activeTab === 'analytics' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="mb-10">
@@ -872,9 +907,10 @@ const App: React.FC = () => {
               <AnalyticsDashboard tasks={state.tasks} />
             </div>
           ) : (
-            <div className="h-[calc(100vh-8rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="h-[calc(100vh-8rem)] w-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
               <NotesTaker
                 notes={state.notes || []}
+                tasks={state.tasks || []}
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
                 onAddNote={handleAddNote}
@@ -899,14 +935,16 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="mt-6 py-4 border-t border-white/5 text-center">
-        <div className="flex items-center justify-center gap-6 mb-4">
-          <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/10"></div>
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">Lumina Core v1.3</span>
-          <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/10"></div>
-        </div>
-        <p className="text-slate-500 text-xs">Crafted for personal excellence.</p>
-      </footer>
+      {activeTab !== 'notes' && (
+        <footer className="mt-6 py-4 border-t border-white/5 text-center">
+          <div className="flex items-center justify-center gap-6 mb-4">
+            <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/10"></div>
+            <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">Lumina Core v1.3</span>
+            <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/10"></div>
+          </div>
+          <p className="text-slate-500 text-xs">Crafted for personal excellence.</p>
+        </footer>
+      )}
     </div>
   );
 };

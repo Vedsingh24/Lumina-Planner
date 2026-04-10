@@ -11,6 +11,8 @@ export interface Task {
   createdAt: string;
   completedAt?: string;
   date: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
   isRecurring?: boolean;
   recurringSourceId?: string; // Links a daily clone back to its recurring source
 }

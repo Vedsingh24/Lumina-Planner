@@ -23,6 +23,8 @@ export const geminiService = {
         - description (string, brief)
         - category (one of: General, Work, Personal, Health, Finance, Learning)
         - priority (one of: low, medium, high)
+        - startTime (optional string, strictly 24-hour "HH:mm" format if implied)
+        - endTime (optional string, strictly 24-hour "HH:mm" format if implied or calculable from duration)
 
         User Input: "${input}"`,
         config: { 
