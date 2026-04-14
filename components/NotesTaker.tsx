@@ -297,7 +297,7 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
       <div className="flex justify-between items-center px-4 py-2 border-b border-white/5 glass-panel z-50 relative">
         <div className="flex items-center gap-3 relative">
           <h2 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Daily Journal</h2>
-          <div className="flex items-center bg-slate-900 border border-white/10 rounded-lg shadow-sm">
+          <div className="flex items-center bg-slate-900 border border-white/10 rounded-lg shadow-sm relative">
             <button onClick={handlePrevNote} className="px-1.5 py-1 text-slate-500 hover:text-blue-400 hover:bg-white/5 transition-colors rounded-l-lg" title="Previous Note">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
@@ -311,11 +311,9 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
             <button onClick={handleNextNote} className="px-1.5 py-1 text-slate-500 hover:text-blue-400 hover:bg-white/5 transition-colors rounded-r-lg" title="Next Note">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
-          </div>
-          {isCalendarOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsCalendarOpen(false)}></div>
-              <div className="absolute top-10 left-0 z-50">
+            {isCalendarOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsCalendarOpen(false); }}></div>
                 <CalendarPicker
                   selectedDate={selectedDate}
                   onSelectDate={(d) => { onSelectDate(d); setIsCalendarOpen(false); }}
@@ -323,9 +321,9 @@ const NotesTaker: React.FC<NotesTakerProps> = ({
                   highlightDates={availableDates}
                   onClose={() => setIsCalendarOpen(false)}
                 />
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button 

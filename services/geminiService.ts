@@ -14,10 +14,11 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Analyze the following user input.
-        If the input is complete gibberish or clearly not actionable, return exactly an empty array: []
-        If the input has poor grammar but implies actionable tasks, auto-correct the intent and extract the tasks.
-        Return ONLY a valid JSON array of task objects (no markdown, no backticks).
+        contents: `You are an expert planner assistant. Extract all actionable tasks from the following user input.
+        Even if the grammar is poor, casual, or shorthand (e.g., "gym 2 to 4"), identify the intent and create tasks.
+        IF AND ONLY IF the input is completely meaningless conversational filler or keyboard mashing (e.g., "asdf" or "hello"), return an empty array: []
+        
+        Return ONLY a valid JSON array of task objects.
         For each task include:
         - title (string)
         - description (string, brief)
@@ -28,7 +29,7 @@ export const geminiService = {
 
         User Input: "${input}"`,
         config: { 
-          temperature: 0,
+          temperature: 0.1,
           responseMimeType: "application/json"
         }
       });
@@ -43,18 +44,5 @@ export const geminiService = {
       console.error('processAgenda error:', e);
       return [];
     }
-  },
-
-  // Use local canned responses to avoid frequent API calls for small chats
-  getChatResponse: async (message: string, currentTasks: any[]) => {
-    const canned = [
-      "You got this! Keep focused on what matters most.",
-      "That sounds like a solid plan. How can I help you organize it?",
-      "Great energy! Break that down into smaller tasks if you need to.",
-      "I'm here to help. Want me to turn this into actionable tasks?",
-      "Perfect mindset! Let's make it happen.",
-      "Love the ambition. What's the first step?"
-    ];
-    return canned[Math.floor(Math.random() * canned.length)];
   }
 };

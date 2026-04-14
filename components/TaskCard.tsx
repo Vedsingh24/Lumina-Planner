@@ -167,14 +167,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                       type="time" 
                       value={editStartTime} 
                       onChange={e => setEditStartTime(e.target.value)}
-                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none transition-all duration-200 hover:bg-white/10 hover:text-white cursor-pointer px-1 py-0.5 rounded [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                      style={{ colorScheme: 'dark' }}
                     />
                     <span className="text-slate-500 text-xs">-</span>
                     <input 
                       type="time" 
                       value={editEndTime}
                       onChange={e => setEditEndTime(e.target.value)}
-                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none transition-all duration-200 hover:bg-white/10 hover:text-white cursor-pointer px-1 py-0.5 rounded [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                      style={{ colorScheme: 'dark' }}
                     />
                   </div>
                   <div className="flex justify-end gap-2">

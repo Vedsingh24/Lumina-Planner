@@ -476,6 +476,15 @@ const App: React.FC = () => {
      Chat Logic
      ========================= */
   const handleSendMessage = async (content: string) => {
+    // Dynamic ping check
+    try {
+      await fetch('https://clients3.google.com/generate_204', { mode: 'no-cors', cache: 'no-store' });
+      if (isOffline) setIsOffline(false);
+    } catch {
+      setIsOffline(true);
+      return; // Do not process prompt if no internet
+    }
+
     setIsChatLoading(true);
     const today = new Date().toISOString();
 
@@ -517,8 +526,8 @@ const App: React.FC = () => {
           ? `I've created ${newTasksData.length} new tasks and arranged your schedule for you! Check your board or schedule tab.`
           : `I've created ${newTasksData.length} new tasks for you. Check your board!`;
       } else {
-        // If no tasks were found, use the conversational fallback
-        replyContent = await geminiService.getChatResponse(content, state.tasks);
+        // If no tasks were found (gibberish or pure conversation), prompt to repeat
+        replyContent = "I didn't quite catch that. Could you repeat?";
       }
 
       // 3. Add Assistant Response
@@ -561,7 +570,7 @@ const App: React.FC = () => {
     : [{ role: 'assistant' as const, content: "Hi! I'm Lumina. Drop your rough agenda here, and I'll turn it into an organized checklist for you.", timestamp: new Date().toISOString() }];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30">
+    <div className={`flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30 ${activeTab === 'notes' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
 
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
@@ -935,7 +944,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {activeTab !== 'notes' && (
+      {(activeTab === 'board' || activeTab === 'analytics') && (
         <footer className="mt-6 py-4 border-t border-white/5 text-center">
           <div className="flex items-center justify-center gap-6 mb-4">
             <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/10"></div>
