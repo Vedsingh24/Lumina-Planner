@@ -71,26 +71,24 @@ export const storageService = {
     };
   },
 
-  // Save state: appends/updates today's entry and prunes old data
+  // Save state: writes to BOTH IPC and localStorage for maximum persistence
   saveState: async (state: PlannerState): Promise<void> => {
-    const ipc = getIpcRenderer();
-    console.log('💾 saveState called, IPC available:', !!ipc);
-    console.log('  Tasks to save:', state.tasks?.length || 0);
-
-    if (ipc) {
-      try {
-        console.log('  Calling invoke(storage-save)...');
-        const result = await (ipc as any).invoke('storage-save', state);
-        console.log('  Save result:', result);
-        return;
-      } catch (e) {
-        console.error('  ✗ IPC save failed:', e);
-      }
+    // ✅ Always write to localStorage as non-volatile fallback
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.warn('localStorage write failed:', e);
     }
 
-    // Fallback to localStorage
-    console.log('  Using localStorage fallback');
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const ipc = getIpcRenderer();
+    if (ipc) {
+      try {
+        await (ipc as any).invoke('storage-save', state);
+        return;
+      } catch (e) {
+        console.error('IPC save failed (localStorage backup used):', e);
+      }
+    }
   },
 
   addTask: (task: Task): void => {

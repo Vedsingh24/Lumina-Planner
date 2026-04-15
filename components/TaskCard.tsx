@@ -47,7 +47,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
   };
 
   return (
-    <div className={`group relative p-4 rounded-xl border transition-all duration-300 ${task.completed
+    <div className={`group relative p-4 rounded-xl border transition-colors duration-300 ${task.completed
       ? 'bg-slate-800/40 border-slate-700 opacity-75'
       : 'bg-slate-800 border-slate-700 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5'
       }`}>
@@ -162,21 +162,26 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                   placeholder="Task description"
                 />
                 <div className="flex justify-between items-center gap-2 mt-1">
-                  <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg border border-blue-500/20">
+                  <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-md group/time hover:bg-blue-500/15 hover:border-blue-500/40 transition-all duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 flex-shrink-0 group-hover/time:text-blue-300 transition-colors">
+                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
                     <input 
-                      type="time" 
+                      type="text"
                       value={editStartTime} 
                       onChange={e => setEditStartTime(e.target.value)}
-                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none transition-all duration-200 hover:bg-white/10 hover:text-white cursor-pointer px-1 py-0.5 rounded [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-                      style={{ colorScheme: 'dark' }}
+                      placeholder="HH:MM"
+                      maxLength={5}
+                      className="bg-transparent text-[11px] font-mono font-bold text-blue-300 outline-none w-12 cursor-text hover:text-white focus:text-white placeholder:text-blue-500/40 transition-colors"
                     />
-                    <span className="text-slate-500 text-xs">-</span>
+                    <span className="text-blue-500/60 text-xs">–</span>
                     <input 
-                      type="time" 
+                      type="text"
                       value={editEndTime}
                       onChange={e => setEditEndTime(e.target.value)}
-                      className="bg-transparent text-xs text-slate-300 outline-none w-20 appearance-none transition-all duration-200 hover:bg-white/10 hover:text-white cursor-pointer px-1 py-0.5 rounded [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
-                      style={{ colorScheme: 'dark' }}
+                      placeholder="HH:MM"
+                      maxLength={5}
+                      className="bg-transparent text-[11px] font-mono font-bold text-blue-300 outline-none w-12 cursor-text hover:text-white focus:text-white placeholder:text-blue-500/40 transition-colors"
                     />
                   </div>
                   <div className="flex justify-end gap-2">
@@ -253,7 +258,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
         )}
       </div>
 
-      {task.completed && (
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{ maxHeight: task.completed ? '80px' : '0px', opacity: task.completed ? 1 : 0 }}
+      >
         <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between">
           <span className="text-xs text-slate-500 font-medium uppercase">Performance Rating</span>
           <div className="flex gap-1">
@@ -261,15 +269,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
               <button
                 key={star}
                 onClick={() => onRate(task.id, star)}
-                className={`transition-colors ${(task.rating || 0) >= star ? 'text-yellow-400' : 'text-slate-600 hover:text-slate-400'
-                  }`}
+                className={`transition-colors ${(task.rating || 0) >= star ? 'text-yellow-400' : 'text-slate-600 hover:text-slate-400'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
               </button>
             ))}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Hover Merge Button */}
       {onMerge && !task.completed && !isEditing && !isLast && (

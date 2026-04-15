@@ -6,11 +6,6 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export const geminiService = {
   // Convert natural language into an array of simple task objects
   processAgenda: async (input: string) => {
-    // Guard against offline usage
-    if (!navigator.onLine) {
-      console.warn('Offline — skipping Gemini API call');
-      return [];
-    }
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -28,7 +23,7 @@ export const geminiService = {
         - endTime (optional string, strictly 24-hour "HH:mm" format if implied or calculable from duration)
 
         User Input: "${input}"`,
-        config: { 
+        config: {
           temperature: 0.1,
           responseMimeType: "application/json"
         }

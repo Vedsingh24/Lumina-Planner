@@ -39,10 +39,10 @@ function checkAndUpdateBestDay(allTasks: Task[]): boolean {
   if (yesterdayDone > best.count) {
     return true;
   }
-  
+
   // Also show on every subsequent launch TODAY if yesterday was the record-breaking day
   if (best.date === yesterday && yesterdayDone === best.count) {
-    return true; 
+    return true;
   }
 
   return false;
@@ -51,7 +51,7 @@ function checkAndUpdateBestDay(allTasks: Task[]): boolean {
 const App: React.FC = () => {
   // 🎉 Confetti: Best-day logic enabled
   const [showConfetti, setShowConfetti] = useState(() => checkAndUpdateBestDay(storageService.loadState().tasks));
-  
+
   // 🌐 Offline detection
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   useEffect(() => {
@@ -70,7 +70,7 @@ const App: React.FC = () => {
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     const allTasks = storageService.loadState().tasks;
     const yesterdayDone = allTasks.filter(t => t.date === yesterday && t.completed).length;
-    
+
     if (yesterdayDone > 0) {
       const rawBest = localStorage.getItem(BEST_DAY_KEY);
       const best: { count: number } = rawBest ? JSON.parse(rawBest) : { count: 0 };
@@ -259,13 +259,16 @@ const App: React.FC = () => {
       const tasksToAdd: Task[] = newTasksData.map(data => ({
         id: crypto.randomUUID(),
         title: data.title,
-        description: data.description || 'No description provided.',
+        description: data.description || '',
         category: data.category || 'General',
         priority: data.priority || 'medium',
         completed: false,
         rating: null,
         createdAt: new Date().toISOString(),
-        date: selectedDate
+        date: selectedDate,
+        // ✅ Forward schedule times from AI response
+        ...(data.startTime ? { startTime: data.startTime } : {}),
+        ...(data.endTime   ? { endTime:   data.endTime   } : {}),
       }));
 
       setState(prev => ({
@@ -356,10 +359,10 @@ const App: React.FC = () => {
       const task = prev.tasks.find(t => t.id === id);
       if (!task) return prev;
       const newRecurring = !task.isRecurring;
-      
+
       // Determine the source ID (this task might be a clone)
       const sourceId = task.recurringSourceId || task.id;
-      
+
       return {
         ...prev,
         tasks: prev.tasks.map(t => {
@@ -522,7 +525,7 @@ const App: React.FC = () => {
         handleTasksGenerated(newTasksData);
         // Check if any of the tasks have start time set
         const hasSchedule = newTasksData.some(t => t.startTime || t.endTime);
-        replyContent = hasSchedule 
+        replyContent = hasSchedule
           ? `I've created ${newTasksData.length} new tasks and arranged your schedule for you! Check your board or schedule tab.`
           : `I've created ${newTasksData.length} new tasks for you. Check your board!`;
       } else {
@@ -901,10 +904,10 @@ const App: React.FC = () => {
                   <p className="text-slate-500 text-sm">Drag to move, pull edges to resize. Shape your ideal day.</p>
                 </div>
               </div>
-              <ScheduleBoard 
-                tasks={state.tasks} 
-                selectedDate={selectedDate} 
-                onUpdateTask={updateTask} 
+              <ScheduleBoard
+                tasks={state.tasks}
+                selectedDate={selectedDate}
+                onUpdateTask={updateTask}
               />
             </div>
           ) : activeTab === 'analytics' ? (
