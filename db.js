@@ -34,6 +34,8 @@ function initDB(userDataPath) {
       createdAt TEXT,
       completedAt TEXT,
       date TEXT,
+      startTime TEXT,
+      endTime TEXT,
       isRecurring INTEGER DEFAULT 0,
       recurringSourceId TEXT
     );
@@ -56,9 +58,11 @@ function initDB(userDataPath) {
     CREATE INDEX IF NOT EXISTS idx_notes_date ON notes(date);
   `);
 
-    // Migration: add recurring columns to existing tables
-    try { db.exec('ALTER TABLE tasks ADD COLUMN isRecurring INTEGER DEFAULT 0'); } catch (e) { /* column already exists */ }
-    try { db.exec('ALTER TABLE tasks ADD COLUMN recurringSourceId TEXT'); } catch (e) { /* column already exists */ }
+    // Migrations: add columns to existing tables if they don't exist
+    try { db.exec('ALTER TABLE tasks ADD COLUMN isRecurring INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
+    try { db.exec('ALTER TABLE tasks ADD COLUMN recurringSourceId TEXT'); } catch (e) { /* exists */ }
+    try { db.exec('ALTER TABLE tasks ADD COLUMN startTime TEXT'); } catch (e) { /* exists */ }
+    try { db.exec('ALTER TABLE tasks ADD COLUMN endTime TEXT'); } catch (e) { /* exists */ }
 
     // Check for legacy JSON data and migrate if needed
     migrateFromJSON(userDataPath);
@@ -164,9 +168,11 @@ function loadState() {
         // Load Tasks
         const tasks = db.prepare('SELECT * FROM tasks').all().map(t => ({
             ...t,
-            completed: !!t.completed, // Convert 0/1 to boolean
-            isRecurring: !!t.isRecurring, // Convert 0/1 to boolean
-            recurringSourceId: t.recurringSourceId || undefined
+            completed: !!t.completed,
+            isRecurring: !!t.isRecurring,
+            recurringSourceId: t.recurringSourceId || undefined,
+            startTime: t.startTime || undefined,
+            endTime:   t.endTime   || undefined,
         }));
 
         // Load Chat History
@@ -232,8 +238,10 @@ function saveState(state) {
 
             // Upsert current tasks
             const upsertTask = db.prepare(`
-        INSERT OR REPLACE INTO tasks (id, title, description, category, priority, completed, rating, createdAt, completedAt, date, isRecurring, recurringSourceId)
-        VALUES (@id, @title, @description, @category, @priority, @completed, @rating, @createdAt, @completedAt, @date, @isRecurring, @recurringSourceId)
+        INSERT OR REPLACE INTO tasks
+          (id, title, description, category, priority, completed, rating, createdAt, completedAt, date, startTime, endTime, isRecurring, recurringSourceId)
+        VALUES
+          (@id, @title, @description, @category, @priority, @completed, @rating, @createdAt, @completedAt, @date, @startTime, @endTime, @isRecurring, @recurringSourceId)
       `);
 
             for (const task of state.tasks) {
@@ -246,8 +254,10 @@ function saveState(state) {
                     completed: task.completed ? 1 : 0,
                     rating: task.rating,
                     createdAt: task.createdAt,
-                    completedAt: task.completedAt,
+                    completedAt: task.completedAt || null,
                     date: task.date,
+                    startTime: task.startTime || null,
+                    endTime:   task.endTime   || null,
                     isRecurring: task.isRecurring ? 1 : 0,
                     recurringSourceId: task.recurringSourceId || null
                 });

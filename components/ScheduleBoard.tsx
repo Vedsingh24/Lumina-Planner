@@ -9,13 +9,12 @@ interface ScheduleBoardProps {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const PPM = 3;           // pixels per minute
-const TOTAL_MINS = 1440; // 24 × 60
+const PPM = 3;
+const TOTAL_MINS = 1440;
 const BOARD_WIDTH = TOTAL_MINS * PPM;
-const ROW_HEIGHT = 160;
-const SNAP_MINS = 15;    // snap to 15-min grid (finer than 30)
-const POP_THRESHOLD = 80; // px above/below row before task pops out to unscheduled
-const SCROLL_ZONE = 90;   // px from board edge to start auto-scroll
+const ROW_HEIGHT = 110;  // Slimmer rows
+const SNAP_MINS = 15;
+const SCROLL_ZONE = 90;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const toMins = (t?: string): number => {
@@ -57,11 +56,12 @@ interface TaskBlockProps {
   onCommitResizeRight: (id: string, end: number)   => void;
   onUnschedule:        (id: string) => void;
   setAnyDragging:      (v: boolean) => void;
+  setIsOverTrash:      (v: boolean) => void;
 }
 
 const TaskBlock: React.FC<TaskBlockProps> = ({
   task, isActiveDay, scrollRef, trackRef,
-  onCommitMove, onCommitResizeLeft, onCommitResizeRight, onUnschedule, setAnyDragging,
+  onCommitMove, onCommitResizeLeft, onCommitResizeRight, onUnschedule, setAnyDragging, setIsOverTrash,
 }) => {
   const startM = toMins(task.startTime);
   const endM   = toMins(task.endTime) || startM + 60;
@@ -71,9 +71,8 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
   const [vWidth,   setVWidth]   = useState(dur * PPM);
   const [liveLabel, setLiveLabel] = useState(`${task.startTime ?? ''} – ${task.endTime ?? ''}`);
   const [isDragging, setIsDragging] = useState(false);
-  const [poppingOut, setPoppingOut] = useState(false);
+  const [isTaskOverTrash, setIsTaskOverTrash] = useState(false);
 
-  // Sync when external task data changes
   useEffect(() => {
     setVLeft(startM * PPM);
     setVWidth(dur * PPM);
@@ -119,19 +118,21 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     const onMm = (ev: MouseEvent) => {
       cancelAnimationFrame(raf.current);
       raf.current = requestAnimationFrame(() => {
-        const scrollOff = scrollRef.current?.scrollLeft ?? 0;
         const dx     = ev.clientX - startX;
         const dMins  = snap(dx / PPM);
-
-        // Y pop-out check (only for move)
-        if (type === 'move' && trackRef.current) {
-          const r = trackRef.current.getBoundingClientRect();
-          setPoppingOut(ev.clientY < r.top - POP_THRESHOLD || ev.clientY > r.bottom + POP_THRESHOLD);
-        }
 
         doAutoScroll(ev.clientX);
 
         if (type === 'move') {
+          const trashEl = document.getElementById('sched-trash');
+          let over = false;
+          if (trashEl) {
+            const r = trashEl.getBoundingClientRect();
+            over = (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom);
+          }
+          setIsTaskOverTrash(over);
+          setIsOverTrash(over);
+
           let ns = clamp(origStart + dMins, 0, TOTAL_MINS - (origEnd - origStart));
           let ne = ns + (origEnd - origStart);
           setVLeft(ns * PPM);
@@ -140,7 +141,7 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
           const ne = clamp(origEnd + dMins, origStart + SNAP_MINS, TOTAL_MINS);
           setVWidth(Math.max(SNAP_MINS * PPM, (ne - origStart) * PPM));
           setLiveLabel(`${toTime(origStart)} – ${toTime(snap(ne))}`);
-        } else { // resize-left
+        } else {
           const ns = clamp(origStart + dMins, 0, origEnd - SNAP_MINS);
           setVLeft(ns * PPM);
           setVWidth(Math.max(SNAP_MINS * PPM, (origEnd - ns) * PPM));
@@ -156,25 +157,17 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       window.removeEventListener('mouseup', onMu);
       setIsDragging(false);
       setAnyDragging(false);
-      setPoppingOut(false);
+      setIsTaskOverTrash(false);
+      setIsOverTrash(false);
 
       const dx    = ev.clientX - startX;
       const dMins = snap(dx / PPM);
 
-      // Check trash zone first
+      // Check trash zone — ONLY way to unschedule a placed task
       const trashEl = document.getElementById('sched-trash');
       if (trashEl) {
         const r = trashEl.getBoundingClientRect();
         if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) {
-          onUnschedule(task.id);
-          return;
-        }
-      }
-
-      // Check Y pop-out
-      if (type === 'move' && trackRef.current) {
-        const r = trackRef.current.getBoundingClientRect();
-        if (ev.clientY < r.top - POP_THRESHOLD || ev.clientY > r.bottom + POP_THRESHOLD) {
           onUnschedule(task.id);
           return;
         }
@@ -200,8 +193,10 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
   return (
     <div
       onMouseDown={(e) => beginDrag(e, 'move')}
-      className={`absolute top-10 bottom-4 rounded-xl border-2 backdrop-blur-sm shadow-xl flex items-stretch overflow-visible group/tb select-none bg-gradient-to-br ${s.bg} ${s.border} ${s.text} ${s.shadow} ${
-        poppingOut ? 'opacity-30 scale-90' : isDragging ? 'shadow-2xl shadow-black/50 z-50 scale-[1.02]' : 'z-10 hover:z-20 hover:scale-[1.01]'
+      className={`absolute top-8 bottom-3 rounded-xl border-2 backdrop-blur-sm shadow-xl flex items-stretch overflow-visible group/tb select-none transition-all duration-150 ${
+        isTaskOverTrash
+          ? 'bg-red-500/80 border-red-400/90 text-white shadow-red-500/40 scale-95 opacity-80 z-50'
+          : `bg-gradient-to-br ${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-2xl shadow-black/50 z-50 scale-[1.02]' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
       }`}
       style={{
         left:  vLeft,
@@ -223,20 +218,13 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       )}
 
       {/* Content */}
-      <div className="flex-1 min-w-0 flex gap-1.5 items-center px-2 py-2 pointer-events-none overflow-hidden">
-        <div className="w-1 h-7 bg-white/30 rounded-full flex-shrink-0" />
+      <div className="flex-1 min-w-0 flex gap-1.5 items-center px-2 py-1.5 pointer-events-none overflow-hidden">
+        <div className="w-1 h-5 bg-white/30 rounded-full flex-shrink-0" />
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="font-bold text-xs truncate leading-tight">{task.title}</p>
           <p className="text-[10px] opacity-70 font-mono tracking-wide mt-0.5 tabular-nums">{liveLabel}</p>
         </div>
       </div>
-
-      {/* Pop-out overlay */}
-      {poppingOut && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl pointer-events-none backdrop-blur-[1px]">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/80">Release to unschedule</span>
-        </div>
-      )}
 
       {/* Right resize grip */}
       {isActiveDay && (
@@ -263,6 +251,7 @@ interface TrackProps {
   onCommitResizeRight: (id: string, e: number) => void;
   onUnschedule:        (id: string) => void;
   setAnyDragging:      (v: boolean) => void;
+  setIsOverTrash:      (v: boolean) => void;
 }
 
 const Track: React.FC<TrackProps> = (props) => {
@@ -299,11 +288,32 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
   const [sidebarDragId, setSidebarDragId] = useState<string | null>(null);
   const ghostRef = useRef<HTMLElement | null>(null);
 
-  const yd = getAdjacentDate(selectedDate, -1);
-  const td = getAdjacentDate(selectedDate,  1);
+  const daysInfo = Array.from({ length: 10 }).map((_, i) => {
+    const d = i - 8; // from -8 up to 1
+    const dt = getAdjacentDate(selectedDate, d);
+    let name = "";
+    if (d === 0) name = "Today";
+    else if (d === -1) name = "Yesterday";
+    else if (d === 1) name = "Tomorrow";
+    else name = new Date(dt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return { date: dt, name, isActive: dt === selectedDate };
+  });
 
   const scheduled   = (date: string) => tasks.filter(t => t.date === date && !!t.startTime);
   const unscheduled = tasks.filter(t => t.date === selectedDate && !t.startTime && !t.completed);
+
+  // Auto-scroll to first task of the selected day on mount/date change
+  useEffect(() => {
+    if (scrollRef.current) {
+      const todayTasks = scheduled(selectedDate);
+      if (todayTasks.length > 0) {
+        const earliest = Math.min(...todayTasks.map(t => toMins(t.startTime)));
+        scrollRef.current.scrollLeft = Math.max(0, earliest * PPM - 90);
+      } else {
+        scrollRef.current.scrollLeft = 8 * 60 * PPM; // fallback to 8 AM
+      }
+    }
+  }, [selectedDate]);
 
   const handleMove        = useCallback((id: string, s: number, e: number) => onUpdateTask(id, { startTime: toTime(s), endTime: toTime(e) }), [onUpdateTask]);
   const handleResizeLeft  = useCallback((id: string, s: number) => onUpdateTask(id, { startTime: toTime(s) }), [onUpdateTask]);
@@ -319,7 +329,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
     const task = tasks.find(t => t.id === taskId);
     const s    = getS(task?.category ?? 'General');
 
-    // Build ghost element
+    // Build ghost element — straight, no tilt
     const ghost = document.createElement('div');
     ghost.style.cssText = [
       'position:fixed;z-index:9999;pointer-events:none;',
@@ -327,7 +337,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
       'font-size:12px;font-weight:800;',
       'backdrop-filter:blur(12px);',
       'box-shadow:0 20px 48px rgba(0,0,0,0.6);',
-      'transform:scale(1.06) rotate(-1.5deg);',
+      'transform:scale(1.06);',  // No rotate — stays parallel to UI
       'transition:transform 0.1s;',
       `left:${e.clientX - 88}px;top:${e.clientY - 24}px;`,
       'max-width:176px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
@@ -392,18 +402,21 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
     onCommitResizeRight: handleResizeRight,
     onUnschedule: handleUnschedule,
     setAnyDragging,
+    setIsOverTrash,
   };
 
   return (
-    <div className="flex gap-5 h-full min-h-[600px] flex-col md:flex-row select-none">
+    <div className="flex gap-5 h-full flex-col md:flex-row select-none overflow-hidden">
 
-      {/* Sidebar */}
-      <div className="w-full md:w-56 flex-shrink-0">
-        <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm shadow-xl h-full overflow-y-auto">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 pb-2 border-b border-white/5 sticky top-0 bg-slate-800/90 backdrop-blur-sm">
-            Unscheduled
-          </h3>
-          <div className="flex flex-col gap-2.5">
+      {/* Sidebar — fixed width, full height, header pinned + cards scroll */}
+      <div className="w-full md:w-56 flex-shrink-0 flex flex-col h-full">
+        <div className="bg-slate-800/50 rounded-xl border border-white/5 backdrop-blur-sm shadow-xl flex flex-col h-full overflow-hidden">
+          {/* Pinned header */}
+          <div className="px-4 pt-4 pb-2 border-b border-white/5 flex-shrink-0">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Unscheduled</h3>
+          </div>
+          {/* Scrollable cards */}
+          <div className="flex flex-col gap-2.5 p-4 overflow-y-auto flex-1 min-h-0">
             {unscheduled.length === 0 && (
               <p className="text-xs text-slate-500 italic text-center py-8 bg-slate-900/40 rounded-xl border border-dashed border-white/10">All tasks scheduled!</p>
             )}
@@ -413,7 +426,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
                 <div
                   key={task.id}
                   onMouseDown={(e) => startSidebarDrag(e, task.id)}
-                  className={`p-3 rounded-xl border-2 cursor-grab bg-gradient-to-br ${s.bg} ${s.border} ${s.text} transition-all duration-150 shadow-md ${
+                  className={`p-3 rounded-xl border-2 cursor-grab bg-gradient-to-br ${s.bg} ${s.border} ${s.text} transition-all duration-150 shadow-md flex-shrink-0 ${
                     sidebarDragId === task.id ? 'opacity-30 scale-95' : 'hover:scale-[1.02] hover:shadow-lg'
                   }`}
                 >
@@ -431,21 +444,21 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
         {/* Scrollable board */}
         <div
           ref={scrollRef}
-          className="flex-1 bg-slate-900/40 rounded-2xl border border-white/5 p-4 overflow-x-auto overflow-y-hidden custom-scrollbar"
+          className="flex-1 bg-slate-900/40 rounded-2xl border border-white/5 p-4 overflow-auto custom-scrollbar"
           style={{ userSelect: 'none' }}
         >
-          <div className="relative flex flex-col" style={{ width: BOARD_WIDTH, minHeight: ROW_HEIGHT * 3 + 48 }}>
+          <div className="relative flex flex-col" style={{ width: BOARD_WIDTH, height: 'max-content', paddingBottom: 20 }}>
 
             {/* Hour grid */}
             <div className="absolute inset-0 pointer-events-none">
               {Array.from({ length: 49 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`absolute top-0 bottom-0 ${i % 2 === 0 ? 'border-l border-white/[0.06]' : 'border-l border-white/[0.025] border-dashed'}`}
+                  className={`absolute top-0 bottom-0 z-0 ${i % 2 === 0 ? 'border-l border-white/[0.06]' : 'border-l border-white/[0.025] border-dashed'}`}
                   style={{ left: i * 30 * PPM }}
                 >
                   {i % 2 === 0 && (
-                    <span className="text-[9px] font-semibold text-slate-600 bg-slate-900/50 px-1 pt-0.5 block leading-tight">
+                    <span className="text-[9px] font-semibold text-slate-600 bg-slate-900/50 px-1 pt-0.5 block leading-tight sticky top-0">
                       {String(i / 2).padStart(2, '0')}:00
                     </span>
                   )}
@@ -455,9 +468,15 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
 
             {/* Tracks */}
             <div className="relative z-10 pt-5 space-y-0.5">
-              <Track name="Yesterday" trackTasks={scheduled(yd)}            isActiveDay={false} {...commonTrackProps} />
-              <Track name="Today"     trackTasks={scheduled(selectedDate)}  isActiveDay={true}  {...commonTrackProps} />
-              <Track name="Tomorrow"  trackTasks={scheduled(td)}            isActiveDay={false} {...commonTrackProps} />
+              {daysInfo.map((info) => (
+                <Track
+                  key={info.date}
+                  name={info.name}
+                  trackTasks={scheduled(info.date)}
+                  isActiveDay={info.isActive}
+                  {...commonTrackProps}
+                />
+              ))}
             </div>
 
           </div>

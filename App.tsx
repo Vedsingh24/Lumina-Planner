@@ -897,18 +897,20 @@ const App: React.FC = () => {
               </div>
             </>
           ) : activeTab === 'schedule' ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-[calc(100vh-12rem)]">
-              <div className="mb-6 flex justify-between items-end">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 7rem)' }}>
+              <div className="mb-4 flex justify-between items-end flex-shrink-0">
                 <div>
                   <h2 className="text-3xl font-black text-white tracking-tight mb-1">Time Sheet</h2>
                   <p className="text-slate-500 text-sm">Drag to move, pull edges to resize. Shape your ideal day.</p>
                 </div>
               </div>
-              <ScheduleBoard
-                tasks={state.tasks}
-                selectedDate={selectedDate}
-                onUpdateTask={updateTask}
-              />
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ScheduleBoard
+                  tasks={state.tasks}
+                  selectedDate={selectedDate}
+                  onUpdateTask={updateTask}
+                />
+              </div>
             </div>
           ) : activeTab === 'analytics' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
