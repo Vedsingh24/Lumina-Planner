@@ -37,11 +37,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
   };
 
   const handleSaveEdit = () => {
-    onUpdate(task.id, { 
-      title: editTitle, 
+    onUpdate(task.id, {
+      title: editTitle,
       description: editDesc,
       startTime: editStartTime || undefined,
-      endTime: editEndTime || undefined 
+      endTime: editEndTime || undefined
     });
     setIsEditing(false);
   };
@@ -164,18 +164,18 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                 <div className="flex justify-between items-center gap-2 mt-1">
                   <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-md group/time hover:bg-blue-500/15 hover:border-blue-500/40 transition-all duration-200">
                     <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 flex-shrink-0 group-hover/time:text-blue-300 transition-colors">
-                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <input 
+                    <input
                       type="text"
-                      value={editStartTime} 
+                      value={editStartTime}
                       onChange={e => setEditStartTime(e.target.value)}
                       placeholder="HH:MM"
                       maxLength={5}
                       className="bg-transparent text-[11px] font-mono font-bold text-blue-300 outline-none w-12 cursor-text hover:text-white focus:text-white placeholder:text-blue-500/40 transition-colors"
                     />
                     <span className="text-blue-500/60 text-xs">–</span>
-                    <input 
+                    <input
                       type="text"
                       value={editEndTime}
                       onChange={e => setEditEndTime(e.target.value)}
@@ -217,11 +217,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                   onClick={() => onToggleRecurring(task.id)}
                   aria-label={task.isRecurring ? "Remove recurring" : "Make recurring"}
                   title={task.isRecurring ? "This task repeats daily \u2014 click to stop" : "Repeat this task every day"}
-                  className={`p-1.5 bg-slate-800/80 rounded-lg border transition-all duration-300 ease-out active:scale-90 active:translate-y-[2px] active:shadow-[inset_0_3px_6px_rgba(0,0,0,0.6)] ${
-                    task.isRecurring
+                  className={`p-1.5 bg-slate-800/80 rounded-lg border transition-all duration-300 ease-out active:scale-90 active:translate-y-[2px] active:shadow-[inset_0_3px_6px_rgba(0,0,0,0.6)] ${task.isRecurring
                       ? 'text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10 opacity-100'
                       : 'text-slate-500 hover:text-emerald-400 border-transparent hover:border-emerald-500/30 opacity-0 group-hover:opacity-100'
-                  }`}
+                    }`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z" />

@@ -36,12 +36,12 @@ const getAdjacentDate = (dateStr: string, d: number) => {
 // ── Category colors — matched exactly to user spec from the Insights chart ──
 // Learning=purple, Work=orange, Personal=blue, Health=green, Finance=teal, General=red
 const CAT: Record<string, { bg: string; border: string; text: string; shadow: string }> = {
-  Learning: { bg: 'from-violet-500/90 to-violet-700/90', border: 'border-violet-400/70', text: 'text-white',    shadow: 'shadow-violet-500/25' },
-  Work:     { bg: 'from-amber-500/90 to-amber-700/90',   border: 'border-amber-400/70',  text: 'text-amber-50', shadow: 'shadow-amber-500/25'  },
-  Personal: { bg: 'from-blue-500/90 to-blue-700/90',     border: 'border-blue-400/70',   text: 'text-white',    shadow: 'shadow-blue-500/25'   },
-  Health:   { bg: 'from-emerald-500/90 to-emerald-700/90', border: 'border-emerald-400/70', text: 'text-white', shadow: 'shadow-emerald-500/25' },
-  Finance:  { bg: 'from-cyan-500/90 to-cyan-700/90',     border: 'border-cyan-400/70',   text: 'text-white',    shadow: 'shadow-cyan-500/25'   },
-  General:  { bg: 'from-red-500/90 to-red-700/90',       border: 'border-red-400/70',    text: 'text-white',    shadow: 'shadow-red-500/25'    },
+  Learning: { bg: 'bg-violet-600', border: 'border-violet-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
+  Work: { bg: 'bg-amber-600', border: 'border-amber-400', text: 'text-amber-50', shadow: 'shadow-md shadow-black/20' },
+  Personal: { bg: 'bg-blue-600', border: 'border-blue-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
+  Health: { bg: 'bg-emerald-600', border: 'border-emerald-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
+  Finance: { bg: 'bg-cyan-600', border: 'border-cyan-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
+  General: { bg: 'bg-red-600', border: 'border-red-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
 };
 const getS = (cat: string) => CAT[cat] || CAT['General'];
 
@@ -50,13 +50,13 @@ interface TaskBlockProps {
   task: Task;
   isActiveDay: boolean;
   scrollRef: React.RefObject<HTMLDivElement>;
-  trackRef:  React.RefObject<HTMLDivElement>;
-  onCommitMove:        (id: string, start: number, end: number) => void;
-  onCommitResizeLeft:  (id: string, start: number) => void;
-  onCommitResizeRight: (id: string, end: number)   => void;
-  onUnschedule:        (id: string) => void;
-  setAnyDragging:      (v: boolean) => void;
-  setIsOverTrash:      (v: boolean) => void;
+  trackRef: React.RefObject<HTMLDivElement>;
+  onCommitMove: (id: string, start: number, end: number) => void;
+  onCommitResizeLeft: (id: string, start: number) => void;
+  onCommitResizeRight: (id: string, end: number) => void;
+  onUnschedule: (id: string) => void;
+  setAnyDragging: (v: boolean) => void;
+  setIsOverTrash: (v: boolean) => void;
 }
 
 const TaskBlock: React.FC<TaskBlockProps> = ({
@@ -64,14 +64,16 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
   onCommitMove, onCommitResizeLeft, onCommitResizeRight, onUnschedule, setAnyDragging, setIsOverTrash,
 }) => {
   const startM = toMins(task.startTime);
-  const endM   = toMins(task.endTime) || startM + 60;
-  const dur    = Math.max(SNAP_MINS, endM - startM);
+  const endM = toMins(task.endTime) || startM + 60;
+  const dur = Math.max(SNAP_MINS, endM - startM);
 
-  const [vLeft,    setVLeft]    = useState(startM * PPM);
-  const [vWidth,   setVWidth]   = useState(dur * PPM);
+  const [vLeft, setVLeft] = useState(startM * PPM);
+  const [vWidth, setVWidth] = useState(dur * PPM);
   const [liveLabel, setLiveLabel] = useState(`${task.startTime ?? ''} – ${task.endTime ?? ''}`);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragType, setDragType] = useState<'move' | 'resize-left' | 'resize-right' | null>(null);
   const [isTaskOverTrash, setIsTaskOverTrash] = useState(false);
+  const ghostRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setVLeft(startM * PPM);
@@ -79,7 +81,7 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     setLiveLabel(`${task.startTime ?? ''} – ${task.endTime ?? ''}`);
   }, [startM, endM, dur, task.startTime, task.endTime]);
 
-  const raf    = useRef<number>(0);
+  const raf = useRef<number>(0);
   const scrollRaf = useRef<number>(0);
 
   const stopScroll = () => cancelAnimationFrame(scrollRaf.current);
@@ -88,10 +90,10 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     if (!scrollRef.current) return;
     const br = scrollRef.current.getBoundingClientRect();
     const right = br.right - clientX;
-    const left  = clientX - br.left;
+    const left = clientX - br.left;
     let speed = 0, dir = 0;
-    if (right > 0 && right < SCROLL_ZONE)  { dir =  1; speed = Math.ceil((SCROLL_ZONE - right) / 6); }
-    if (left  > 0 && left  < SCROLL_ZONE)  { dir = -1; speed = Math.ceil((SCROLL_ZONE - left)  / 6); }
+    if (right > 0 && right < SCROLL_ZONE) { dir = 1; speed = Math.ceil((SCROLL_ZONE - right) / 6); }
+    if (left > 0 && left < SCROLL_ZONE) { dir = -1; speed = Math.ceil((SCROLL_ZONE - left) / 6); }
     if (!speed) return;
     const step = () => {
       if (scrollRef.current) scrollRef.current.scrollLeft += dir * speed;
@@ -109,17 +111,18 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     e.stopPropagation();
 
     const origStart = startM;
-    const origEnd   = endM;
-    const startX    = e.clientX;
+    const origEnd = endM;
+    const startX = e.clientX;
 
     setIsDragging(true);
+    setDragType(type);
     setAnyDragging(true);
 
     const onMm = (ev: MouseEvent) => {
       cancelAnimationFrame(raf.current);
       raf.current = requestAnimationFrame(() => {
-        const dx     = ev.clientX - startX;
-        const dMins  = snap(dx / PPM);
+        const dx = ev.clientX - startX;
+        const dMins = snap(dx / PPM);
 
         doAutoScroll(ev.clientX);
 
@@ -130,6 +133,33 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
             const r = trashEl.getBoundingClientRect();
             over = (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom);
           }
+
+          const s = getS(task.category);
+          if (!ghostRef.current) {
+            const ghost = document.createElement('div');
+            ghost.style.cssText = [
+              'position:fixed;z-index:9999;pointer-events:none;',
+              'font-size:12px;font-weight:800;color:white;',
+              'backdrop-filter:blur(12px);',
+              'box-shadow:0 20px 48px rgba(0,0,0,0.6);',
+              'transform:scale(1.06);transition:background-color 0.1s, border-color 0.1s;',
+              'max-width:176px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
+              `left:${ev.clientX - 88}px;top:${ev.clientY - 24}px;`
+            ].join('');
+            ghost.className = over 
+              ? 'text-white bg-red-600 border-red-400 shadow-red-900/40 p-2 rounded-xl border-2' 
+              : `text-white bg-gradient-to-br ${s.bg} ${s.border} p-2 rounded-xl border-2`;
+            ghost.innerHTML = `<div style="truncate">${task.title}</div><div style="font-size:10px;opacity:0.65;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">${task.category}</div>`;
+            document.body.appendChild(ghost);
+            ghostRef.current = ghost;
+          } else {
+            ghostRef.current.style.left = `${ev.clientX - 88}px`;
+            ghostRef.current.style.top = `${ev.clientY - 24}px`;
+            ghostRef.current.className = over 
+              ? 'text-white bg-red-600 border-red-400 shadow-red-900/40 p-2 rounded-xl border-2' 
+              : `text-white bg-gradient-to-br ${s.bg} ${s.border} p-2 rounded-xl border-2`;
+          }
+
           setIsTaskOverTrash(over);
           setIsOverTrash(over);
 
@@ -152,15 +182,20 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
 
     const onMu = (ev: MouseEvent) => {
       cancelAnimationFrame(raf.current);
+      if (ghostRef.current) {
+        document.body.removeChild(ghostRef.current);
+        ghostRef.current = null;
+      }
       stopScroll();
       window.removeEventListener('mousemove', onMm);
       window.removeEventListener('mouseup', onMu);
       setIsDragging(false);
+      setDragType(null);
       setAnyDragging(false);
       setIsTaskOverTrash(false);
       setIsOverTrash(false);
 
-      const dx    = ev.clientX - startX;
+      const dx = ev.clientX - startX;
       const dMins = snap(dx / PPM);
 
       // Check trash zone — ONLY way to unschedule a placed task
@@ -186,31 +221,32 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     window.addEventListener('mousemove', onMm);
     window.addEventListener('mouseup', onMu);
   }, [isActiveDay, startM, endM, task.id, scrollRef, trackRef, doAutoScroll,
-      onCommitMove, onCommitResizeLeft, onCommitResizeRight, onUnschedule, setAnyDragging]);
+    onCommitMove, onCommitResizeLeft, onCommitResizeRight, onUnschedule, setAnyDragging]);
 
   const s = getS(task.category);
 
   return (
     <div
       onMouseDown={(e) => beginDrag(e, 'move')}
-      className={`absolute top-8 bottom-3 rounded-xl border-2 backdrop-blur-sm shadow-xl flex items-stretch overflow-visible group/tb select-none transition-all duration-150 ${
-        isTaskOverTrash
-          ? 'bg-red-500/80 border-red-400/90 text-white shadow-red-500/40 scale-95 opacity-80 z-50'
-          : `bg-gradient-to-br ${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-2xl shadow-black/50 z-50 scale-[1.02]' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
-      }`}
+      className={`absolute top-8 bottom-3 rounded-xl border-2 flex items-stretch overflow-hidden group/tb select-none transition-all duration-150 ${isDragging && dragType === 'move'
+          ? `opacity-30 border-dashed pointer-events-none z-auto ${s.bg} ${s.border} ${s.text}`
+          : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
+        } ${task.completed ? 'opacity-70 border-emerald-900/40' : ''}`}
       style={{
-        left:  vLeft,
+        left: vLeft,
         width: Math.max(SNAP_MINS * PPM, vWidth),
         cursor: isActiveDay ? (isDragging ? 'grabbing' : 'grab') : 'default',
         transition: isDragging ? 'opacity 0.1s, transform 0.1s' : 'box-shadow 0.2s, transform 0.15s, opacity 0.15s',
         willChange: 'left, width',
       }}
     >
+      {task.completed && <div className="animate-premium-shimmer z-0" />}
+      
       {/* Left resize grip */}
       {isActiveDay && (
         <div
           onMouseDown={(e) => { e.stopPropagation(); beginDrag(e, 'resize-left'); }}
-          className="w-3 flex-shrink-0 cursor-ew-resize flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover/tb:opacity-100 transition-opacity hover:bg-white/15 rounded-l-xl border-r border-white/15 pointer-events-auto"
+          className="w-3 flex-shrink-0 cursor-ew-resize flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover/tb:opacity-100 transition-opacity hover:bg-white/15 rounded-l-xl border-r border-white/15 pointer-events-auto relative z-10"
         >
           <div className="w-0.5 h-5 bg-white/50 rounded-full" />
           <div className="w-0.5 h-3 bg-white/30 rounded-full" />
@@ -218,7 +254,7 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       )}
 
       {/* Content */}
-      <div className="flex-1 min-w-0 flex gap-1.5 items-center px-2 py-1.5 pointer-events-none overflow-hidden">
+      <div className="flex-1 min-w-0 flex gap-1.5 items-center px-2 py-1.5 pointer-events-none overflow-hidden relative z-10">
         <div className="w-1 h-5 bg-white/30 rounded-full flex-shrink-0" />
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="font-bold text-xs truncate leading-tight">{task.title}</p>
@@ -230,7 +266,7 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       {isActiveDay && (
         <div
           onMouseDown={(e) => { e.stopPropagation(); beginDrag(e, 'resize-right'); }}
-          className="w-3 flex-shrink-0 cursor-ew-resize flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover/tb:opacity-100 transition-opacity hover:bg-white/15 rounded-r-xl border-l border-white/15 pointer-events-auto"
+          className="w-3 flex-shrink-0 cursor-ew-resize flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover/tb:opacity-100 transition-opacity hover:bg-white/15 rounded-r-xl border-l border-white/15 pointer-events-auto relative z-10"
         >
           <div className="w-0.5 h-3 bg-white/30 rounded-full" />
           <div className="w-0.5 h-5 bg-white/50 rounded-full" />
@@ -246,12 +282,12 @@ interface TrackProps {
   trackTasks: Task[];
   isActiveDay: boolean;
   scrollRef: React.RefObject<HTMLDivElement>;
-  onCommitMove:        (id: string, s: number, e: number) => void;
-  onCommitResizeLeft:  (id: string, s: number) => void;
+  onCommitMove: (id: string, s: number, e: number) => void;
+  onCommitResizeLeft: (id: string, s: number) => void;
   onCommitResizeRight: (id: string, e: number) => void;
-  onUnschedule:        (id: string) => void;
-  setAnyDragging:      (v: boolean) => void;
-  setIsOverTrash:      (v: boolean) => void;
+  onUnschedule: (id: string) => void;
+  setAnyDragging: (v: boolean) => void;
+  setIsOverTrash: (v: boolean) => void;
 }
 
 const Track: React.FC<TrackProps> = (props) => {
@@ -260,10 +296,9 @@ const Track: React.FC<TrackProps> = (props) => {
   return (
     <div
       ref={trackRef}
-      className={`relative w-full border-b border-white/5 ${isActiveDay ? 'bg-slate-900/30' : 'opacity-40 hover:opacity-55 transition-opacity'}`}
-      style={{ height: ROW_HEIGHT }}
+      className={`relative w-full border-b border-white/5 flex flex-1 min-h-[80px] ${isActiveDay ? 'bg-slate-900/30' : 'opacity-40 hover:opacity-55 transition-opacity'}`}
     >
-      <div className="absolute left-3 top-2 z-20 pointer-events-none">
+      <div className="sticky left-3 top-2 z-20 pointer-events-none h-0 w-max overflow-visible">
         <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 bg-slate-950/60 px-1.5 py-0.5 rounded">{name}</span>
       </div>
       {trackTasks.map(task => (
@@ -283,13 +318,14 @@ const Track: React.FC<TrackProps> = (props) => {
 // ── ScheduleBoard ────────────────────────────────────────────────────────────
 const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUpdateTask }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [anyDragging,  setAnyDragging]  = useState(false);
-  const [isOverTrash,  setIsOverTrash]  = useState(false);
+  const [anyDragging, setAnyDragging] = useState(false);
+  const [isOverTrash, setIsOverTrash] = useState(false);
   const [sidebarDragId, setSidebarDragId] = useState<string | null>(null);
+  const [dayOffset, setDayOffset] = useState(0);
   const ghostRef = useRef<HTMLElement | null>(null);
 
-  const daysInfo = Array.from({ length: 10 }).map((_, i) => {
-    const d = i - 8; // from -8 up to 1
+  const daysInfo = Array.from({ length: 3 }).map((_, i) => {
+    const d = dayOffset + i - 1; // from dayOffset - 1 to dayOffset + 1
     const dt = getAdjacentDate(selectedDate, d);
     let name = "";
     if (d === 0) name = "Today";
@@ -299,26 +335,28 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
     return { date: dt, name, isActive: dt === selectedDate };
   });
 
-  const scheduled   = (date: string) => tasks.filter(t => t.date === date && !!t.startTime);
+  const centerDate = getAdjacentDate(selectedDate, dayOffset);
+
+  const scheduled = (date: string) => tasks.filter(t => t.date === date && !!t.startTime);
   const unscheduled = tasks.filter(t => t.date === selectedDate && !t.startTime && !t.completed);
 
   // Auto-scroll to first task of the selected day on mount/date change
   useEffect(() => {
     if (scrollRef.current) {
-      const todayTasks = scheduled(selectedDate);
-      if (todayTasks.length > 0) {
-        const earliest = Math.min(...todayTasks.map(t => toMins(t.startTime)));
+      const centerTasks = scheduled(centerDate);
+      if (centerTasks.length > 0) {
+        const earliest = Math.min(...centerTasks.map(t => toMins(t.startTime)));
         scrollRef.current.scrollLeft = Math.max(0, earliest * PPM - 90);
       } else {
         scrollRef.current.scrollLeft = 8 * 60 * PPM; // fallback to 8 AM
       }
     }
-  }, [selectedDate]);
+  }, [centerDate]);
 
-  const handleMove        = useCallback((id: string, s: number, e: number) => onUpdateTask(id, { startTime: toTime(s), endTime: toTime(e) }), [onUpdateTask]);
-  const handleResizeLeft  = useCallback((id: string, s: number) => onUpdateTask(id, { startTime: toTime(s) }), [onUpdateTask]);
-  const handleResizeRight = useCallback((id: string, e: number) => onUpdateTask(id, { endTime:   toTime(e) }), [onUpdateTask]);
-  const handleUnschedule  = useCallback((id: string) => onUpdateTask(id, { startTime: undefined, endTime: undefined }), [onUpdateTask]);
+  const handleMove = useCallback((id: string, s: number, e: number) => onUpdateTask(id, { startTime: toTime(s), endTime: toTime(e) }), [onUpdateTask]);
+  const handleResizeLeft = useCallback((id: string, s: number) => onUpdateTask(id, { startTime: toTime(s) }), [onUpdateTask]);
+  const handleResizeRight = useCallback((id: string, e: number) => onUpdateTask(id, { endTime: toTime(e) }), [onUpdateTask]);
+  const handleUnschedule = useCallback((id: string) => onUpdateTask(id, { startTime: undefined, endTime: undefined }), [onUpdateTask]);
 
   // ── Sidebar card drag ────────────────────────────────────────────────────
   const startSidebarDrag = useCallback((e: React.MouseEvent, taskId: string) => {
@@ -327,7 +365,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
     setAnyDragging(true);
 
     const task = tasks.find(t => t.id === taskId);
-    const s    = getS(task?.category ?? 'General');
+    const s = getS(task?.category ?? 'General');
 
     // Build ghost element — straight, no tilt
     const ghost = document.createElement('div');
@@ -351,7 +389,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
     const onMm = (ev: MouseEvent) => {
       if (ghostRef.current) {
         ghostRef.current.style.left = `${ev.clientX - 88}px`;
-        ghostRef.current.style.top  = `${ev.clientY - 24}px`;
+        ghostRef.current.style.top = `${ev.clientY - 24}px`;
       }
       // Trash hover
       const trashEl = document.getElementById('sched-trash');
@@ -363,9 +401,9 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
       if (scrollRef.current) {
         const br = scrollRef.current.getBoundingClientRect();
         const rightD = br.right - ev.clientX;
-        const leftD  = ev.clientX - br.left;
+        const leftD = ev.clientX - br.left;
         if (rightD > 0 && rightD < SCROLL_ZONE) scrollRef.current.scrollLeft += Math.ceil((SCROLL_ZONE - rightD) / 5);
-        if (leftD  > 0 && leftD  < SCROLL_ZONE) scrollRef.current.scrollLeft -= Math.ceil((SCROLL_ZONE - leftD)  / 5);
+        if (leftD > 0 && leftD < SCROLL_ZONE) scrollRef.current.scrollLeft -= Math.ceil((SCROLL_ZONE - leftD) / 5);
       }
     };
 
@@ -380,12 +418,12 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
       if (scrollRef.current) {
         const br = scrollRef.current.getBoundingClientRect();
         if (ev.clientX >= br.left && ev.clientX <= br.right &&
-            ev.clientY >= br.top  && ev.clientY <= br.bottom) {
+          ev.clientY >= br.top && ev.clientY <= br.bottom) {
           const dropX = ev.clientX - br.left + scrollRef.current.scrollLeft - 16;
           const dropM = snap(Math.max(0, dropX / PPM));
           onUpdateTask(taskId, {
             startTime: toTime(dropM),
-            endTime:   toTime(Math.min(TOTAL_MINS, dropM + 60)),
+            endTime: toTime(Math.min(TOTAL_MINS, dropM + 60)),
           });
         }
       }
@@ -426,9 +464,8 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
                 <div
                   key={task.id}
                   onMouseDown={(e) => startSidebarDrag(e, task.id)}
-                  className={`p-3 rounded-xl border-2 cursor-grab bg-gradient-to-br ${s.bg} ${s.border} ${s.text} transition-all duration-150 shadow-md flex-shrink-0 ${
-                    sidebarDragId === task.id ? 'opacity-30 scale-95' : 'hover:scale-[1.02] hover:shadow-lg'
-                  }`}
+                  className={`p-3 rounded-xl border-2 cursor-grab bg-gradient-to-br ${s.bg} ${s.border} ${s.text} transition-all duration-150 shadow-md flex-shrink-0 ${sidebarDragId === task.id ? 'opacity-30 scale-95' : 'hover:scale-[1.02] hover:shadow-lg'
+                    }`}
                 >
                   <p className="font-bold text-sm truncate">{task.title}</p>
                   <p className="text-[10px] opacity-65 mt-0.5 font-semibold uppercase tracking-wide">{task.category}</p>
@@ -440,14 +477,34 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
       </div>
 
       {/* Right: board + trash */}
-      <div className="flex-1 flex flex-col gap-2.5 min-w-0">
+      <div className="flex-1 flex flex-col gap-2.5 min-w-0 relative group/board">
+        {/* Up/Down Navigation Arrows */}
+        <div className="absolute right-4 top-4 z-20 flex gap-2">
+          {dayOffset > -9 && (
+            <button 
+              onClick={() => setDayOffset(p => Math.max(-9, p - 3))}
+              className="w-8 h-8 rounded-full bg-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-600 flex items-center justify-center transition-all duration-300 backdrop-blur-sm shadow-lg opacity-0 group-hover/board:opacity-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+          )}
+          {dayOffset < 9 && (
+            <button 
+              onClick={() => setDayOffset(p => Math.min(9, p + 3))}
+              className="w-8 h-8 rounded-full bg-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-600 flex items-center justify-center transition-all duration-300 backdrop-blur-sm shadow-lg opacity-0 group-hover/board:opacity-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          )}
+        </div>
+
         {/* Scrollable board */}
         <div
           ref={scrollRef}
-          className="flex-1 bg-slate-900/40 rounded-2xl border border-white/5 p-4 overflow-auto custom-scrollbar"
+          className="flex-1 bg-slate-900/40 rounded-2xl border border-white/5 p-4 overflow-x-auto overflow-y-hidden custom-scrollbar flex flex-col"
           style={{ userSelect: 'none' }}
         >
-          <div className="relative flex flex-col" style={{ width: BOARD_WIDTH, height: 'max-content', paddingBottom: 20 }}>
+          <div className="relative flex flex-col flex-1 min-h-full" style={{ width: BOARD_WIDTH, paddingBottom: 20 }}>
 
             {/* Hour grid */}
             <div className="absolute inset-0 pointer-events-none">
@@ -467,7 +524,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
             </div>
 
             {/* Tracks */}
-            <div className="relative z-10 pt-5 space-y-0.5">
+            <div className="relative z-10 pt-5 space-y-0.5 flex flex-col flex-1 h-full">
               {daysInfo.map((info) => (
                 <Track
                   key={info.date}
@@ -491,11 +548,10 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
               animate={{ opacity: 1, y: 0, height: isOverTrash ? 64 : 48 }}
               exit={{ opacity: 0, y: 8, height: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className={`flex-shrink-0 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all duration-200 overflow-hidden ${
-                isOverTrash
+              className={`flex-shrink-0 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all duration-200 overflow-hidden ${isOverTrash
                   ? 'border-red-500/60 bg-red-500/10 shadow-lg shadow-red-900/20'
                   : 'border-slate-600/30 bg-slate-800/20'
-              }`}
+                }`}
             >
               {/* Trash icon changes on hover */}
               <motion.svg
