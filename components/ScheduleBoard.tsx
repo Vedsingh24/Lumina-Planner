@@ -42,6 +42,7 @@ const CAT: Record<string, { bg: string; border: string; text: string; shadow: st
   Health: { bg: 'bg-emerald-600', border: 'border-emerald-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
   Finance: { bg: 'bg-cyan-600', border: 'border-cyan-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
   General: { bg: 'bg-red-600', border: 'border-red-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
+  Travel: { bg: 'bg-pink-600', border: 'border-pink-400', text: 'text-white', shadow: 'shadow-md shadow-black/20' },
 };
 const getS = (cat: string) => CAT[cat] || CAT['General'];
 
@@ -316,7 +317,10 @@ const Track: React.FC<TrackProps> = (props) => {
 };
 
 // ── ScheduleBoard ────────────────────────────────────────────────────────────
-const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUpdateTask }) => {
+const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selectedDate, onUpdateTask }) => {
+  const validCategories = ['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'];
+  const tasks = rawTasks.map(t => ({...t, category: validCategories.includes(t.category) ? t.category : 'General'}));
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const [anyDragging, setAnyDragging] = useState(false);
   const [isOverTrash, setIsOverTrash] = useState(false);
@@ -324,8 +328,8 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks, selectedDate, onUp
   const [dayOffset, setDayOffset] = useState(0);
   const ghostRef = useRef<HTMLElement | null>(null);
 
-  const daysInfo = Array.from({ length: 3 }).map((_, i) => {
-    const d = dayOffset + i - 1; // from dayOffset - 1 to dayOffset + 1
+  const daysInfo = Array.from({ length: 5 }).map((_, i) => {
+    const d = dayOffset + i - 2; // from dayOffset - 2 to dayOffset + 2
     const dt = getAdjacentDate(selectedDate, d);
     let name = "";
     if (d === 0) name = "Today";

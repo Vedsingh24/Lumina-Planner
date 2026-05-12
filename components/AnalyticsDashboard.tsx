@@ -77,15 +77,17 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     // Category distribution
+    const validCategories = ['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'];
     const categories: Record<string, { count: number, totalRating: number, ratedCount: number }> = {};
     tasks.forEach(t => {
-      if (!categories[t.category]) {
-        categories[t.category] = { count: 0, totalRating: 0, ratedCount: 0 };
+      const cat = validCategories.includes(t.category) ? t.category : 'General';
+      if (!categories[cat]) {
+        categories[cat] = { count: 0, totalRating: 0, ratedCount: 0 };
       }
-      categories[t.category].count++;
+      categories[cat].count++;
       if (t.rating) {
-        categories[t.category].totalRating += t.rating;
-        categories[t.category].ratedCount++;
+        categories[cat].totalRating += t.rating;
+        categories[cat].ratedCount++;
       }
     });
 
@@ -159,7 +161,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     return { total, completed, rate, categoryData, avgRating, completionTrend, priorityData, monthData };
   }, [tasks]);
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899'];
 
   if (tasks.length === 0) {
     return (

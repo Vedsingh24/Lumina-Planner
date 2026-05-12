@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Reorder } from 'framer-motion';
 import { storageService } from './services/storageService';
 import { geminiService } from './services/geminiService';
-import { Task, PlannerState, ChatMessage, Note } from './types';
+import { Task, PlannerState, ChatMessage, Note, TaskCategory } from './types';
 import ChatInterface from './components/ChatInterface';
 import TaskCard from './components/TaskCard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
@@ -116,7 +116,7 @@ const App: React.FC = () => {
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
   const [manualTitle, setManualTitle] = useState('');
   const [manualDesc, setManualDesc] = useState('');
-  const [manualCategory, setManualCategory] = useState<string>('General');
+  const [manualCategory, setManualCategory] = useState<TaskCategory>('General');
   const [manualPriority, setManualPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
   const handleManualAdd = () => {
@@ -161,6 +161,13 @@ const App: React.FC = () => {
      ========================= */
   useEffect(() => {
     const saved = storageService.loadState();
+    
+    // Sanitize legacy categories to match the new strict TaskCategory union
+    const validCategories = ['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'];
+    saved.tasks = saved.tasks.map(t => ({
+      ...t,
+      category: validCategories.includes(t.category) ? (t.category as TaskCategory) : 'General'
+    }));
 
     // ♻️ Recurring task hydration — clone recurring tasks to today if not already present
     const today = new Date().toISOString().split('T')[0];
@@ -261,7 +268,7 @@ const App: React.FC = () => {
         title: data.title,
         description: data.description || '',
         category: data.category || 'General',
-        priority: data.priority || 'medium',
+        priority: (data.priority || 'medium').toLowerCase(),
         completed: false,
         rating: null,
         createdAt: new Date().toISOString(),
@@ -345,10 +352,19 @@ const App: React.FC = () => {
   };
 
   const deleteTask = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      tasks: prev.tasks.filter(t => t.id !== id)
-    }));
+    setState(prev => {
+      const taskToDelete = prev.tasks.find(t => t.id === id);
+      if (taskToDelete && taskToDelete.isRecurring) {
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t => t.id === id ? { ...t, isDeleted: true } : t)
+        };
+      }
+      return {
+        ...prev,
+        tasks: prev.tasks.filter(t => t.id !== id)
+      };
+    });
   };
 
   /* =========================
@@ -458,7 +474,16 @@ const App: React.FC = () => {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
-  const filteredTasks = state.tasks.filter(t => {
+  const sanitizedTasks = useMemo(() => {
+    const validCategories = ['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'];
+    return state.tasks.map(t => ({
+      ...t,
+      category: validCategories.includes(t.category) ? (t.category as TaskCategory) : 'General'
+    }));
+  }, [state.tasks]);
+
+  const filteredTasks = sanitizedTasks.filter(t => {
+    if (t.isDeleted) return false;
     if (t.date !== selectedDate) return false;
     if (filter === 'pending') return !t.completed;
     if (filter === 'completed') return t.completed;
@@ -519,19 +544,15 @@ const App: React.FC = () => {
       let replyContent = '';
 
       // Always attempt to interpret input as tasks first (User's request for smarter detection)
-      const newTasksData = await geminiService.processAgenda(content);
+      const result = await geminiService.processAgenda(content);
+      const newTasksData = result.tasks;
 
       if (newTasksData && newTasksData.length > 0) {
         handleTasksGenerated(newTasksData);
-        // Check if any of the tasks have start time set
-        const hasSchedule = newTasksData.some(t => t.startTime || t.endTime);
-        replyContent = hasSchedule
-          ? `I've created ${newTasksData.length} new tasks and arranged your schedule for you! Check your board or schedule tab.`
-          : `I've created ${newTasksData.length} new tasks for you. Check your board!`;
-      } else {
-        // If no tasks were found (gibberish or pure conversation), prompt to repeat
-        replyContent = "I didn't quite catch that. Could you repeat?";
       }
+      
+      // Use the LLM's conversational reply
+      replyContent = result.reply;
 
       // 3. Add Assistant Response
       const assistantMsg: ChatMessage = {
@@ -573,7 +594,7 @@ const App: React.FC = () => {
     : [{ role: 'assistant' as const, content: "Hi! I'm Lumina. Drop your rough agenda here, and I'll turn it into an organized checklist for you.", timestamp: new Date().toISOString() }];
 
   return (
-    <div className={`flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30 ${activeTab === 'notes' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`flex flex-col bg-[#020617] text-slate-100 selection:bg-blue-500/30 ${['notes', 'schedule'].includes(activeTab) ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
 
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
@@ -747,7 +768,7 @@ const App: React.FC = () => {
                           <CalendarPicker
                             selectedDate={selectedDate}
                             onSelectDate={setSelectedDate}
-                            tasks={state.tasks}
+                            tasks={sanitizedTasks.filter(t => !t.isDeleted)}
                             onClose={() => setIsCalendarOpen(false)}
                           />
                         </>
@@ -814,9 +835,9 @@ const App: React.FC = () => {
                         <select
                           className="bg-slate-900/50 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none focus:border-blue-500"
                           value={manualCategory}
-                          onChange={e => setManualCategory(e.target.value)}
+                          onChange={e => setManualCategory(e.target.value as TaskCategory)}
                         >
-                          {['General', 'Work', 'Personal', 'Health', 'Finance', 'Learning'].map(c => (
+                          {['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'].map(c => (
                             <option key={c} value={c}>{c}</option>
                           ))}
                         </select>
@@ -906,7 +927,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ScheduleBoard
-                  tasks={state.tasks}
+                  tasks={sanitizedTasks.filter(t => !t.isDeleted)}
                   selectedDate={selectedDate}
                   onUpdateTask={updateTask}
                 />
@@ -918,13 +939,13 @@ const App: React.FC = () => {
                 <h2 className="text-4xl font-black text-white tracking-tight mb-2">Your Velocity</h2>
                 <p className="text-slate-500 text-lg">Visualizing your progress over the last few weeks.</p>
               </div>
-              <AnalyticsDashboard tasks={state.tasks} />
+              <AnalyticsDashboard tasks={sanitizedTasks.filter(t => !t.isDeleted)} />
             </div>
           ) : (
             <div className="h-[calc(100vh-8rem)] w-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
               <NotesTaker
                 notes={state.notes || []}
-                tasks={state.tasks || []}
+                tasks={sanitizedTasks.filter(t => !t.isDeleted)}
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
                 onAddNote={handleAddNote}
@@ -939,7 +960,7 @@ const App: React.FC = () => {
           <div className="lg:col-span-4 lg:sticky lg:top-28 h-[calc(100vh-10rem)]">
             <ChatInterface
               onTasksGenerated={handleTasksGenerated}
-              existingTasks={state.tasks}
+              existingTasks={sanitizedTasks.filter(t => !t.isDeleted)}
               messages={currentChatMessages}
               onSendMessage={handleSendMessage}
               isLoading={isChatLoading}

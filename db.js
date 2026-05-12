@@ -37,7 +37,8 @@ function initDB(userDataPath) {
       startTime TEXT,
       endTime TEXT,
       isRecurring INTEGER DEFAULT 0,
-      recurringSourceId TEXT
+      recurringSourceId TEXT,
+      isDeleted INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date);
 
@@ -63,6 +64,7 @@ function initDB(userDataPath) {
     try { db.exec('ALTER TABLE tasks ADD COLUMN recurringSourceId TEXT'); } catch (e) { /* exists */ }
     try { db.exec('ALTER TABLE tasks ADD COLUMN startTime TEXT'); } catch (e) { /* exists */ }
     try { db.exec('ALTER TABLE tasks ADD COLUMN endTime TEXT'); } catch (e) { /* exists */ }
+    try { db.exec('ALTER TABLE tasks ADD COLUMN isDeleted INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
 
     // Check for legacy JSON data and migrate if needed
     migrateFromJSON(userDataPath);
@@ -173,6 +175,7 @@ function loadState() {
             recurringSourceId: t.recurringSourceId || undefined,
             startTime: t.startTime || undefined,
             endTime:   t.endTime   || undefined,
+            isDeleted: !!t.isDeleted,
         }));
 
         // Load Chat History
@@ -239,9 +242,9 @@ function saveState(state) {
             // Upsert current tasks
             const upsertTask = db.prepare(`
         INSERT OR REPLACE INTO tasks
-          (id, title, description, category, priority, completed, rating, createdAt, completedAt, date, startTime, endTime, isRecurring, recurringSourceId)
+          (id, title, description, category, priority, completed, rating, createdAt, completedAt, date, startTime, endTime, isRecurring, recurringSourceId, isDeleted)
         VALUES
-          (@id, @title, @description, @category, @priority, @completed, @rating, @createdAt, @completedAt, @date, @startTime, @endTime, @isRecurring, @recurringSourceId)
+          (@id, @title, @description, @category, @priority, @completed, @rating, @createdAt, @completedAt, @date, @startTime, @endTime, @isRecurring, @recurringSourceId, @isDeleted)
       `);
 
             for (const task of state.tasks) {
@@ -259,7 +262,8 @@ function saveState(state) {
                     startTime: task.startTime || null,
                     endTime:   task.endTime   || null,
                     isRecurring: task.isRecurring ? 1 : 0,
-                    recurringSourceId: task.recurringSourceId || null
+                    recurringSourceId: task.recurringSourceId || null,
+                    isDeleted: task.isDeleted ? 1 : 0
                 });
             }
 

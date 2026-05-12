@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task, Priority } from '../types';
+import { Task, Priority, TaskCategory } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TaskCardProps {
@@ -17,7 +17,7 @@ interface TaskCardProps {
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
-const CATEGORIES = ['General', 'Work', 'Personal', 'Health', 'Finance', 'Learning'];
+const CATEGORIES: TaskCategory[] = ['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'];
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, onUpdate, onMerge, onToggleRecurring, isFirst, isLast }) => {
   const [activeDropdown, setActiveDropdown] = useState<'priority' | 'category' | null>(null);
@@ -28,7 +28,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
   const [editEndTime, setEditEndTime] = useState(task.endTime || '');
 
   const getPriorityColor = (p: Priority) => {
-    switch (p) {
+    switch (p?.toLowerCase()) {
       case 'high': return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       case 'low': return 'bg-green-500/20 text-green-400 border-green-500/30';
@@ -91,7 +91,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onRate, onDelete, o
                               onUpdate(task.id, { priority: p });
                               setActiveDropdown(null);
                             }}
-                            className={`px-3 py-1.5 text-[10px] uppercase font-bold rounded-md text-left transition-all ${task.priority === p
+                            className={`px-3 py-1.5 text-[10px] uppercase font-bold rounded-md text-left transition-all ${task.priority?.toLowerCase() === p
                               ? 'bg-white/10 text-white'
                               : 'hover:bg-white/5'
                               } ${p === 'high' ? 'text-red-400 hover:text-red-300' :

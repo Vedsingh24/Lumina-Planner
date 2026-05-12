@@ -4,40 +4,75 @@ import { GoogleGenAI } from "@google/genai";
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const geminiService = {
-  // Convert natural language into an array of simple task objects
-  processAgenda: async (input: string) => {
+  // Convert natural language into an array of simple task objects and a conversational reply
+  processAgenda: async (input: string): Promise<{reply: string, tasks: any[]}> => {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `You are an expert planner assistant. Extract all actionable tasks from the following user input.
-        Even if the grammar is poor, casual, or shorthand (e.g., "gym 2 to 4"), identify the intent and create tasks.
-        IF AND ONLY IF the input is completely meaningless conversational filler or keyboard mashing (e.g., "asdf" or "hello"), return an empty array: []
+        contents: `You are Lumina, an expert AI productivity assistant. 
+        Analyze the user's input to extract actionable tasks AND formulate a natural, conversational response.
         
-        Return ONLY a valid JSON array of task objects.
-        For each task include:
-        - title (string)
-        - description (string, brief)
-        - category (one of: General, Work, Personal, Health, Finance, Learning)
-        - priority (one of: low, medium, high)
-        - startTime (optional string, strictly 24-hour "HH:mm" format if implied)
-        - endTime (optional string, strictly 24-hour "HH:mm" format if implied or calculable from duration)
-
+        Rules:
+        1. If the user provides tasks (even casually, e.g., "gym 2 to 4"), extract them AND set 'reply' to a friendly, encouraging confirmation of what you added.
+        2. If the user is just chatting (e.g., "Hi", "How are you doing?"), return an empty tasks array AND set 'reply' to an appropriate conversational response.
+        3. IF AND ONLY IF the input is completely meaningless conversational filler, keyboard mashing, or highly incomprehensible (e.g., "asdfgasdf"), set 'reply' to EXACTLY "I couldn't understand that. Could you repeat?" and return an empty tasks array.
+        
+        Return ONLY a valid JSON object matching the requested schema.
+        
         User Input: "${input}"`,
         config: {
-          temperature: 0.1,
-          responseMimeType: "application/json"
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              reply: { type: "STRING", description: "Your conversational response to the user" },
+              tasks: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    title: { type: "STRING" },
+                    description: { type: "STRING" },
+                    category: { type: "STRING", enum: ["Health", "Personal", "General", "Work", "Travel", "Finance", "Learning"] },
+                    priority: { type: "STRING" },
+                    startTime: { type: "STRING" },
+                    endTime: { type: "STRING" }
+                  },
+                  required: ["title", "description", "category", "priority"]
+                }
+              }
+            },
+            required: ["reply", "tasks"]
+          }
         }
       });
 
-      const text = (response && response.text) ? response.text.trim() : '';
-      // Try to find a JSON array inside the response (handles markdown code blocks if any)
-      const match = text.match(/\[[\s\S]*\]/);
-      if (!match) return [];
-      const parsed = JSON.parse(match[0]);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
+      let text = (response && response.text) ? response.text.trim() : '{}';
+      // Strip markdown code block formatting if present
+      if (text.startsWith('```')) {
+        text = text.replace(/^```json\n?/, '').replace(/^```\n?/, '');
+        text = text.replace(/\n?```$/, '');
+      }
+      text = text.trim();
+      const parsed = JSON.parse(text);
+      const tasksArray = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+      let fallbackReply = "I didn't quite catch that. Could you repeat?";
+      if (tasksArray.length > 0) {
+        fallbackReply = `I've created ${tasksArray.length} new tasks for you. Check your board!`;
+      }
+      
+      return {
+        reply: parsed.reply || fallbackReply,
+        tasks: tasksArray
+      };
+    } catch (e: any) {
       console.error('processAgenda error:', e);
-      return [];
+      let errorMsg = "I encountered a network or API error while processing that. Please try again.";
+      if (e?.status === 503 || (e?.message && e.message.includes('503'))) {
+        errorMsg = "The AI is currently experiencing high demand. Please try again in a moment.";
+      }
+      return { reply: errorMsg, tasks: [] };
     }
   }
 };

@@ -1,10 +1,11 @@
 export type Priority = 'low' | 'medium' | 'high';
+export type TaskCategory = 'Health' | 'Personal' | 'General' | 'Work' | 'Travel' | 'Finance' | 'Learning';
 
 export interface Task {
   id: string;
   title: string;
   description: string;
-  category: string;
+  category: TaskCategory;
   priority: Priority;
   completed: boolean;
   rating: number | null; // 1-5 scale
@@ -15,6 +16,7 @@ export interface Task {
   endTime?: string; // HH:mm
   isRecurring?: boolean;
   recurringSourceId?: string; // Links a daily clone back to its recurring source
+  isDeleted?: boolean; // Soft delete flag for recurring tasks
 }
 
 export interface DraggableImage {
