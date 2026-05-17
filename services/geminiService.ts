@@ -69,7 +69,9 @@ export const geminiService = {
     } catch (e: any) {
       console.error('processAgenda error:', e);
       let errorMsg = "I encountered a network or API error while processing that. Please try again.";
-      if (e?.status === 503 || (e?.message && e.message.includes('503'))) {
+      if (e?.status === 403 || (e?.message && e.message.includes('403'))) {
+        errorMsg = "API Key Error: Your API key is invalid, expired, or has been disabled (e.g. reported as leaked). Please generate a new API key and update it in .env.local.";
+      } else if (e?.status === 503 || (e?.message && e.message.includes('503'))) {
         errorMsg = "The AI is currently experiencing high demand. Please try again in a moment.";
       }
       return { reply: errorMsg, tasks: [] };
