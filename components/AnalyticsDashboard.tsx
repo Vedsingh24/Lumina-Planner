@@ -161,6 +161,61 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     return { total, completed, rate, categoryData, avgRating, completionTrend, priorityData, monthData };
   }, [tasks]);
 
+  const [view, setView] = useState<'stats' | 'insights'>('stats');
+  const [insightSeed, setInsightSeed] = useState(0);
+
+  const insights = useMemo(() => {
+    const list: { icon: string, color: string, title: string, reason: string }[] = [];
+    
+    // Performance
+    if (stats.rate < 50 && stats.total > 10) {
+      list.push({ icon: '⚠️', color: 'text-amber-500 border-amber-500/30 bg-amber-500/10', title: 'Consider Reducing Workload', reason: `Your completion rate is currently ${stats.rate}%. Trying taking on fewer tasks to build momentum.` });
+    } else if (stats.rate > 80 && stats.total > 10) {
+      list.push({ icon: '🔥', color: 'text-orange-500 border-orange-500/30 bg-orange-500/10', title: 'Peak Efficiency', reason: `Excellent completion rate of ${stats.rate}%. You are operating at a very high level right now.` });
+    }
+
+    // Priorities
+    const highP = stats.priorityData.find(p => p.name === 'High');
+    const medP = stats.priorityData.find(p => p.name === 'Medium');
+    if (highP && medP && highP.count > 0 && medP.count > 0 && highP.rate < medP.rate) {
+      list.push({ icon: '🎯', color: 'text-red-500 border-red-500/30 bg-red-500/10', title: 'Prioritize High-Impact Tasks', reason: `Your completion rate for High priority tasks (${highP.rate}%) is lower than Medium priority (${medP.rate}%). Try tackling the hardest things first.` });
+    }
+
+    // Categories
+    const dom = [...stats.categoryData].sort((a, b) => b.value - a.value)[0];
+    if (dom && dom.value / stats.total > 0.4) {
+      list.push({ icon: '📊', color: 'text-blue-500 border-blue-500/30 bg-blue-500/10', title: `Strong Focus on ${dom.name}`, reason: `Over 40% of your tasks fall under the ${dom.name} category. Make sure this aligns with your long-term goals.` });
+    }
+
+    const unrated = stats.categoryData.find(c => parseFloat(c.avgRating as string) === 0 && c.value > 0);
+    if (unrated) {
+      list.push({ icon: '⭐', color: 'text-violet-500 border-violet-500/30 bg-violet-500/10', title: `Rate Your ${unrated.name} Tasks`, reason: `You haven't been rating your ${unrated.name} tasks. Adding a rating helps track how these activities make you feel.` });
+    }
+
+    // Trend
+    if (stats.completionTrend.length >= 2) {
+      const recent = stats.completionTrend.slice(-3);
+      if (recent.every((d, i) => i === 0 || d.efficiency <= recent[i - 1].efficiency) && recent[0].efficiency > recent[recent.length-1].efficiency) {
+        list.push({ icon: '📉', color: 'text-slate-400 border-slate-500/30 bg-slate-500/10', title: 'Productivity Dip', reason: `Your daily efficiency has trended downward recently. It might be time for a rest day.` });
+      } else if (recent.every((d, i) => i === 0 || d.efficiency >= recent[i - 1].efficiency) && recent[0].efficiency < recent[recent.length-1].efficiency) {
+        list.push({ icon: '📈', color: 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10', title: 'Momentum Building', reason: `Your daily efficiency is trending upwards over the last few days. Keep it up!` });
+      }
+    }
+
+    // Fallbacks if not enough insights
+    if (list.length < 3) {
+      list.push({ icon: '💡', color: 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10', title: 'Consistency is Key', reason: `You've assigned ${stats.total} tasks so far. Small daily steps lead to massive results.` });
+    }
+
+    // Pseudo-random shuffle based on seed
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = (i + insightSeed * 7) % (i + 1);
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+
+    return list.slice(0, 4);
+  }, [stats, insightSeed]);
+
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899'];
 
   if (tasks.length === 0) {
@@ -174,8 +229,29 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Top Cards */}
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex justify-end mb-4">
+        <div className="flex bg-slate-900/80 p-1.5 rounded-2xl border border-white/5 gap-1.5 shadow-lg backdrop-blur-md">
+          <button
+            onClick={() => setView('stats')}
+            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${view === 'stats' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 ring-1 ring-blue-500/50' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="16" y1="12" x2="16" y2="16"></line><line x1="8" y1="10" x2="8" y2="16"></line></svg>
+            Stats
+          </button>
+          <button
+            onClick={() => setView('insights')}
+            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${view === 'insights' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-500/50' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            AI Insights
+          </button>
+        </div>
+      </div>
+
+      {view === 'stats' ? (
+        <>
+          {/* Top Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Tasks Card */}
         <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 shadow-sm group hover:border-blue-500/30 transition-colors">
@@ -393,6 +469,50 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
           <p className="text-[10px] text-slate-500 mt-4 text-center">Total number of tasks assigned across different months.</p>
         </div>
       </div>
+        </>
+      ) : (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
+                <span className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                </span>
+                Automated Insights
+              </h3>
+              <p className="text-slate-400 text-sm mt-2">Personalized feedback based on your recent activity.</p>
+            </div>
+            <button
+              onClick={() => setInsightSeed(s => s + 1)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition-all shadow-md group"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-180 transition-transform duration-500"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.6 5.6"/></svg>
+              Refresh
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {insights.map((insight, index) => (
+              <div
+                key={insight.title + insightSeed}
+                className={`bg-slate-800/60 border border-slate-700 p-6 rounded-3xl shadow-lg flex gap-5 items-start animate-in fade-in slide-in-from-left-8 hover:border-indigo-500/40 transition-colors group relative overflow-hidden`}
+                style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
+              >
+                {/* Background glow */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-colors"></div>
+                
+                <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center text-3xl border shadow-inner ${insight.color}`}>
+                  {insight.icon}
+                </div>
+                <div className="flex-1 min-w-0 z-10">
+                  <h4 className="text-lg font-bold text-slate-100 mb-2">{insight.title}</h4>
+                  <p className="text-sm text-slate-400 leading-relaxed">{insight.reason}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

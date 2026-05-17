@@ -209,7 +209,23 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
         }
       }
 
+      // Check board bounds for valid drop
+      let droppedInsideBoard = true;
+      if (scrollRef.current && type === 'move') {
+        const br = scrollRef.current.getBoundingClientRect();
+        // Give a little leeway so dropping near the edge still counts
+        if (ev.clientX < br.left - 20 || ev.clientX > br.right + 20 || ev.clientY < br.top - 20 || ev.clientY > br.bottom + 20) {
+          droppedInsideBoard = false;
+        }
+      }
+
       if (type === 'move') {
+        if (!droppedInsideBoard && !isTaskOverTrash) {
+          // Snap back if dropped outside the board (and not in trash)
+          setVLeft(origStart * PPM);
+          setLiveLabel(`${toTime(origStart)} – ${toTime(origEnd)}`);
+          return;
+        }
         const ns = clamp(origStart + dMins, 0, TOTAL_MINS - (origEnd - origStart));
         onCommitMove(task.id, snap(ns), snap(ns + (origEnd - origStart)));
       } else if (type === 'resize-right') {
@@ -225,6 +241,24 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     onCommitMove, onCommitResizeLeft, onCommitResizeRight, onUnschedule, setAnyDragging]);
 
   const s = getS(task.category);
+  const isCompleted = task.completed;
+  const [justCompleted, setJustCompleted] = useState(false);
+
+  useEffect(() => {
+    if (isCompleted) {
+      const key = `lumina_anim_${task.id}`;
+      if (!sessionStorage.getItem(key)) {
+        setJustCompleted(true);
+        sessionStorage.setItem(key, '1');
+        // The fill animation is ~1s, then we hold it for a bit before dropping into pulse
+        const t = setTimeout(() => setJustCompleted(false), 2500);
+        return () => clearTimeout(t);
+      }
+    } else {
+      sessionStorage.removeItem(`lumina_anim_${task.id}`);
+      setJustCompleted(false);
+    }
+  }, [isCompleted, task.id]);
 
   return (
     <div
@@ -232,7 +266,7 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       className={`absolute top-8 bottom-3 rounded-xl border-2 flex items-stretch overflow-hidden group/tb select-none transition-all duration-150 ${isDragging && dragType === 'move'
           ? `opacity-30 border-dashed pointer-events-none z-auto ${s.bg} ${s.border} ${s.text}`
           : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
-        } ${task.completed ? 'opacity-70 border-emerald-900/40' : ''}`}
+        } ${isCompleted && !justCompleted ? 'opacity-80 border-emerald-500/50 shadow-emerald-900/30 task-pulse' : ''} ${justCompleted ? 'border-emerald-400 overflow-hidden shadow-emerald-500/40 shadow-xl z-30' : ''}`}
       style={{
         left: vLeft,
         width: Math.max(SNAP_MINS * PPM, vWidth),
@@ -257,11 +291,29 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       {/* Content */}
       <div className="flex-1 min-w-0 flex gap-1.5 items-center px-2 py-1.5 pointer-events-none overflow-hidden relative z-10">
         <div className="w-1 h-5 bg-white/30 rounded-full flex-shrink-0" />
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <p className="font-bold text-xs truncate leading-tight">{task.title}</p>
-          <p className="text-[10px] opacity-70 font-mono tracking-wide mt-0.5 tabular-nums">{liveLabel}</p>
+        <div className="flex-1 min-w-0 overflow-hidden relative">
+          <p className={`font-bold text-xs truncate leading-tight transition-opacity duration-300 ${justCompleted ? 'opacity-0' : 'opacity-100'}`}>{task.title}</p>
+          <p className={`text-[10px] opacity-70 font-mono tracking-wide mt-0.5 tabular-nums transition-opacity duration-300 ${justCompleted ? 'opacity-0' : 'opacity-100'}`}>{liveLabel}</p>
         </div>
       </div>
+
+      {/* Completion Animations Overlays */}
+      {isCompleted && (
+        <>
+          {justCompleted ? (
+            <>
+              {/* Fill background */}
+              <div className="absolute inset-0 bg-emerald-500 z-20 origin-left animate-task-fill" />
+              {/* Done text */}
+              <div className="absolute inset-0 flex items-center justify-center z-30 opacity-0 animate-task-done-text">
+                <span className="font-black text-sm tracking-widest text-white drop-shadow-md">DONE !</span>
+              </div>
+            </>
+          ) : (
+            <div className="animate-premium-shimmer z-0" />
+          )}
+        </>
+      )}
 
       {/* Right resize grip */}
       {isActiveDay && (
@@ -599,6 +651,35 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15,23,42,0.4); border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.2); border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,0.45); }
+
+        @keyframes task-fill {
+          0% { transform: scaleX(0); opacity: 0.8; }
+          40% { transform: scaleX(1); opacity: 1; }
+          100% { transform: scaleX(1); opacity: 1; }
+        }
+        .animate-task-fill {
+          animation: task-fill 2.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes task-done-text {
+          0%, 30% { opacity: 0; transform: scale(0.8) translateY(4px); }
+          45% { opacity: 1; transform: scale(1.1) translateY(0); }
+          55% { opacity: 1; transform: scale(1) translateY(0); }
+          90% { opacity: 1; transform: scale(1) translateY(0); }
+          100% { opacity: 0; transform: scale(0.95) translateY(-2px); }
+        }
+        .animate-task-done-text {
+          animation: task-done-text 2.5s ease-out forwards;
+        }
+
+        @keyframes task-pulse-ring {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+          70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .task-pulse {
+          animation: task-pulse-ring 2s infinite;
+        }
       `}</style>
     </div>
   );
