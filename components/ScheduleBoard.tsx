@@ -147,8 +147,8 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
               'max-width:176px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
               `left:${ev.clientX - 88}px;top:${ev.clientY - 24}px;`
             ].join('');
-            ghost.className = over 
-              ? 'text-white bg-red-600 border-red-400 shadow-red-900/40 p-2 rounded-xl border-2' 
+            ghost.className = over
+              ? 'text-white bg-red-600 border-red-400 shadow-red-900/40 p-2 rounded-xl border-2'
               : `text-white bg-gradient-to-br ${s.bg} ${s.border} p-2 rounded-xl border-2`;
             ghost.innerHTML = `<div style="truncate">${task.title}</div><div style="font-size:10px;opacity:0.65;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">${task.category}</div>`;
             document.body.appendChild(ghost);
@@ -156,8 +156,8 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
           } else {
             ghostRef.current.style.left = `${ev.clientX - 88}px`;
             ghostRef.current.style.top = `${ev.clientY - 24}px`;
-            ghostRef.current.className = over 
-              ? 'text-white bg-red-600 border-red-400 shadow-red-900/40 p-2 rounded-xl border-2' 
+            ghostRef.current.className = over
+              ? 'text-white bg-red-600 border-red-400 shadow-red-900/40 p-2 rounded-xl border-2'
               : `text-white bg-gradient-to-br ${s.bg} ${s.border} p-2 rounded-xl border-2`;
           }
 
@@ -250,8 +250,8 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
       if (!sessionStorage.getItem(key)) {
         setJustCompleted(true);
         sessionStorage.setItem(key, '1');
-        // The fill animation is ~1s, then we hold it for a bit before dropping into pulse
-        const t = setTimeout(() => setJustCompleted(false), 2500);
+        // The fill animation is ~2.5s. We hold the solid green for 1s, then drop into pulse & text
+        const t = setTimeout(() => setJustCompleted(false), 3500);
         return () => clearTimeout(t);
       }
     } else {
@@ -264,10 +264,10 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
     <div
       onMouseDown={(e) => task.id !== 'ghost-preview' ? beginDrag(e, 'move') : undefined}
       className={`absolute top-8 bottom-3 rounded-xl border-2 flex items-stretch overflow-hidden group/tb select-none transition-all duration-150 ${isDragging && dragType === 'move'
-          ? `opacity-30 border-dashed pointer-events-none z-auto ${s.bg} ${s.border} ${s.text}`
-          : task.id === 'ghost-preview'
-            ? `opacity-60 pointer-events-none z-0 ${s.bg} ${s.border} ${s.text}`
-            : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
+        ? `opacity-30 border-dashed pointer-events-none z-auto ${s.bg} ${s.border} ${s.text}`
+        : task.id === 'ghost-preview'
+          ? `opacity-60 pointer-events-none z-0 ${s.bg} ${s.border} ${s.text}`
+          : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
         } ${isCompleted && !justCompleted ? 'border-emerald-500/50 shadow-emerald-900/30 bg-emerald-500 text-white' : ''} ${justCompleted ? 'border-emerald-400 overflow-hidden shadow-emerald-500/40 shadow-xl z-30' : ''}`}
       style={{
         left: vLeft,
@@ -314,8 +314,8 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
               {/* Pulse Ring Overlay */}
               <div className="absolute inset-0 rounded-xl task-pulse pointer-events-none" />
               {/* Solid Background with Shimmering White Gradient */}
-              <div className="absolute inset-0 bg-emerald-500 z-0 animate-in fade-in duration-500" />
-              <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden rounded-xl animate-in fade-in duration-1000 delay-150">
+              <div className="absolute inset-0 bg-emerald-500 z-0 animate-in fade-in duration-700" />
+              <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden rounded-xl animate-in fade-in duration-1000 delay-300">
                 <div className="absolute top-0 bottom-0 left-0 w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
               </div>
             </>
@@ -381,8 +381,8 @@ const Track: React.FC<TrackProps> = (props) => {
 // ── ScheduleBoard ────────────────────────────────────────────────────────────
 const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selectedDate, onUpdateTask }) => {
   const validCategories = ['Health', 'Personal', 'General', 'Work', 'Travel', 'Finance', 'Learning'];
-  const tasks = rawTasks.map(t => ({...t, category: validCategories.includes(t.category) ? t.category : 'General'}));
-  
+  const tasks = rawTasks.map(t => ({ ...t, category: validCategories.includes(t.category) ? t.category : 'General' }));
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [anyDragging, setAnyDragging] = useState(false);
   const [isOverTrash, setIsOverTrash] = useState(false);
@@ -573,7 +573,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
         {/* Up/Down Navigation Arrows */}
         <div className="absolute right-4 top-4 z-20 flex gap-2">
           {dayOffset > -9 && (
-            <button 
+            <button
               onClick={() => setDayOffset(p => Math.max(-9, p - 3))}
               className="w-8 h-8 rounded-full bg-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-600 flex items-center justify-center transition-all duration-300 backdrop-blur-sm shadow-lg opacity-0 group-hover/board:opacity-100"
             >
@@ -581,7 +581,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
             </button>
           )}
           {dayOffset < 9 && (
-            <button 
+            <button
               onClick={() => setDayOffset(p => Math.min(9, p + 3))}
               className="w-8 h-8 rounded-full bg-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-600 flex items-center justify-center transition-all duration-300 backdrop-blur-sm shadow-lg opacity-0 group-hover/board:opacity-100"
             >
@@ -657,8 +657,8 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
               exit={{ opacity: 0, y: 8, height: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
               className={`flex-shrink-0 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all duration-200 overflow-hidden ${isOverTrash
-                  ? 'border-red-500/60 bg-red-500/10 shadow-lg shadow-red-900/20'
-                  : 'border-slate-600/30 bg-slate-800/20'
+                ? 'border-red-500/60 bg-red-500/10 shadow-lg shadow-red-900/20'
+                : 'border-slate-600/30 bg-slate-800/20'
                 }`}
             >
               {/* Trash icon changes on hover */}
@@ -733,12 +733,12 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
         }
 
         @keyframes task-pulse-ring {
-          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
-          70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+          70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
           100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
         .task-pulse {
-          animation: task-pulse-ring 2s infinite;
+          animation: task-pulse-ring 2.5s infinite;
         }
       `}</style>
     </div>
