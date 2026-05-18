@@ -186,8 +186,17 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks, aiInsigh
     setIsGenerating(true);
     setUsageError(null);
     try {
-      // Pass today's existing insights so the LLM doesn't repeat them
-      const generated = await geminiService.generateInsights(stats, todayInsights);
+      // Create a minified version of stats to save on token costs
+      const minifiedStats = {
+        ...stats,
+        // Only send the last 14 days of history to prevent token ballooning over time
+        completionTrend: stats.completionTrend.slice(-14)
+      };
+
+      // Strip verbose styling/UI data from previous insights to save tokens
+      const minifiedPreviousInsights = todayInsights.map(i => ({ title: i.title }));
+
+      const generated = await geminiService.generateInsights(minifiedStats, minifiedPreviousInsights);
       if (generated && generated.length > 0) {
         if (onUpdateInsights) {
             const filtered = aiInsights?.filter(i => i.date !== today) || [];

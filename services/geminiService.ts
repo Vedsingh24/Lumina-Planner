@@ -44,7 +44,8 @@ export const geminiService = {
               }
             },
             required: ["reply", "tasks"]
-          }
+          },
+          maxOutputTokens: 600 // Strict cap to prevent runaway token usage
         }
       });
 
@@ -102,7 +103,8 @@ Schema:
 { "insights": [ { "title": "string", "reason": "string", "icon": "string", "color": "string (tailwind text/border/bg classes)" } ] }`,
         config: {
           temperature: 0.7,
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          maxOutputTokens: 500 // Strict cap to prevent runaway token usage
         }
       });
 
