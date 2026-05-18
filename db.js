@@ -57,6 +57,11 @@ function initDB(userDataPath) {
       createdAt TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_notes_date ON notes(date);
+
+    CREATE TABLE IF NOT EXISTS ai_insights (
+      date TEXT PRIMARY KEY,
+      data TEXT
+    );
   `);
 
     // Migrations: add columns to existing tables if they don't exist
@@ -198,6 +203,10 @@ function loadState() {
             notes: (db.prepare('SELECT * FROM notes').all() || []).map(n => ({
                 ...n,
                 images: JSON.parse(n.images || '[]')
+            })),
+            aiInsights: (db.prepare('SELECT * FROM ai_insights').all() || []).map(i => ({
+                date: i.date,
+                data: JSON.parse(i.data || '[]')
             }))
         };
     } catch (error) {
@@ -319,6 +328,14 @@ function saveState(state) {
                     text: note.text,
                     images: JSON.stringify(note.images || []),
                     createdAt: note.createdAt
+                });
+            }
+            // 5. Save AI Insights
+            const upsertInsight = db.prepare('INSERT OR REPLACE INTO ai_insights (date, data) VALUES (@date, @data)');
+            for (const insight of (state.aiInsights || [])) {
+                upsertInsight.run({
+                    date: insight.date,
+                    data: JSON.stringify(insight.data)
                 });
             }
         });

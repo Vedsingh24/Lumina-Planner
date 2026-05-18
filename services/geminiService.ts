@@ -79,19 +79,23 @@ export const geminiService = {
   },
 
   // Generate dynamic insights based on computed stats
-  generateInsights: async (stats: any): Promise<any[]> => {
+  generateInsights: async (stats: any, previousInsights?: any[]): Promise<any[]> => {
     try {
+      const prevContext = previousInsights && previousInsights.length > 0 
+        ? `\nPREVIOUS INSIGHTS ALREADY SHOWN TO USER:\n${JSON.stringify(previousInsights.map(i => i.title))}\nCRITICAL: You must generate COMPLETELY NEW insights focusing on different metrics, correlations, or deep-dives. Do not reword or repeat the previous insights.` 
+        : '';
+
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `You are an expert productivity analyst. Review the user's task statistics and generate 4 highly specific, actionable insights.
+        contents: `You are an expert productivity analyst. Review the user's task statistics and generate 4 highly specific, actionable, and deeply insightful observations.
 
 Stats:
-${JSON.stringify(stats)}
+${JSON.stringify(stats)}${prevContext}
 
 Rules:
-1. Provide a mix of encouraging successes, mild warnings (if they are struggling or overloaded), and strategic tips.
+1. Provide a mix of encouraging successes, mild warnings (if they are struggling or overloaded), and strategic tips. Go deep into the data.
 2. The 'icon' field MUST be EXACTLY ONE of the following: "clipboard", "check", "star", "lightning", "target", "flame". Do not use emojis.
-3. Keep titles short and punchy. Keep reasons under 2 sentences.
+3. Keep titles short and punchy. Keep reasons insightful but concise.
 4. Output strict JSON only.
 
 Schema:

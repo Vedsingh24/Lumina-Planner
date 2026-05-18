@@ -268,17 +268,15 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
           : task.id === 'ghost-preview'
             ? `opacity-60 pointer-events-none z-0 ${s.bg} ${s.border} ${s.text}`
             : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
-        } ${isCompleted && !justCompleted ? 'border-emerald-500/50 shadow-emerald-900/30 bg-emerald-500 text-white task-pulse' : ''} ${justCompleted ? 'border-emerald-400 overflow-hidden shadow-emerald-500/40 shadow-xl z-30' : ''}`}
+        } ${isCompleted && !justCompleted ? 'border-emerald-500/50 shadow-emerald-900/30 bg-emerald-500 text-white' : ''} ${justCompleted ? 'border-emerald-400 overflow-hidden shadow-emerald-500/40 shadow-xl z-30' : ''}`}
       style={{
         left: vLeft,
         width: Math.max(SNAP_MINS * PPM, vWidth),
         cursor: isActiveDay ? (isDragging ? 'grabbing' : 'grab') : 'default',
-        transition: isDragging ? 'opacity 0.1s, transform 0.1s' : 'box-shadow 0.2s, transform 0.15s, opacity 0.15s',
+        transition: isDragging ? 'opacity 0.1s, transform 0.1s' : 'transform 0.15s, opacity 0.15s',
         willChange: 'left, width',
       }}
     >
-      {task.completed && <div className="animate-premium-shimmer z-0" />}
-      
       {/* Left resize grip */}
       {isActiveDay && (
         <div
@@ -313,10 +311,12 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
             </>
           ) : (
             <>
+              {/* Pulse Ring Overlay */}
+              <div className="absolute inset-0 rounded-xl task-pulse pointer-events-none" />
               {/* Solid Background with Shimmering White Gradient */}
-              <div className="absolute inset-0 bg-emerald-500 z-0" />
-              <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-                <div className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+              <div className="absolute inset-0 bg-emerald-500 z-0 animate-in fade-in duration-500" />
+              <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden rounded-xl animate-in fade-in duration-1000 delay-150">
+                <div className="absolute top-0 bottom-0 left-0 w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
               </div>
             </>
           )}
@@ -726,7 +726,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
 
         @keyframes shimmer-sweep {
           0% { transform: translateX(-100%); }
-          100% { transform: translateX(50%); }
+          100% { transform: translateX(100%); }
         }
         .animate-shimmer {
           animation: shimmer-sweep 3s infinite ease-in-out;

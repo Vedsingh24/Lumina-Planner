@@ -939,7 +939,11 @@ const App: React.FC = () => {
                 <h2 className="text-4xl font-black text-white tracking-tight mb-2">Your Velocity</h2>
                 <p className="text-slate-500 text-lg">Visualizing your progress over the last few weeks.</p>
               </div>
-              <AnalyticsDashboard tasks={sanitizedTasks.filter(t => !t.isDeleted)} />
+              <AnalyticsDashboard 
+                tasks={sanitizedTasks.filter(t => !t.isDeleted)} 
+                aiInsights={state.aiInsights}
+                onUpdateInsights={(newInsights) => setState(prev => ({ ...prev, aiInsights: newInsights }))}
+              />
             </div>
           ) : (
             <div className="h-[calc(100vh-8rem)] w-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">

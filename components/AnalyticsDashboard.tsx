@@ -10,6 +10,8 @@ import { Task } from '../types';
 
 interface AnalyticsDashboardProps {
   tasks: Task[];
+  aiInsights?: { date: string, data: any[] }[];
+  onUpdateInsights?: (insights: { date: string, data: any[] }[]) => void;
 }
 
 // --- Reusable Paginated Chart Wrapper with Hover Arrows ---
@@ -70,7 +72,7 @@ const PaginatedChart: React.FC<PaginatedChartProps> = ({ title, accentColor, dat
   );
 };
 
-const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
+const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks, aiInsights, onUpdateInsights }) => {
   const stats = useMemo(() => {
     const total = tasks.length;
     const completedTasks = tasks.filter(t => t.completed);
@@ -163,12 +165,16 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
   }, [tasks]);
 
   const [view, setView] = useState<'stats' | 'insights'>('stats');
-  const [insights, setInsights] = useState<any[]>([]);
+  
+  const today = new Date().toISOString().split('T')[0];
+  const todayInsights = useMemo(() => {
+    return aiInsights?.find(i => i.date === today)?.data || [];
+  }, [aiInsights, today]);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
 
-  const fetchInsights = async () => {
-    const today = new Date().toISOString().split('T')[0];
+  const fetchInsights = async (forceRefetch = false) => {
     const usageKey = `lumina_insights_usage_${today}`;
     const count = parseInt(localStorage.getItem(usageKey) || '0', 10);
 
@@ -180,9 +186,13 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
     setIsGenerating(true);
     setUsageError(null);
     try {
-      const generated = await geminiService.generateInsights(stats);
+      // Pass today's existing insights so the LLM doesn't repeat them
+      const generated = await geminiService.generateInsights(stats, todayInsights);
       if (generated && generated.length > 0) {
-        setInsights(generated);
+        if (onUpdateInsights) {
+            const filtered = aiInsights?.filter(i => i.date !== today) || [];
+            onUpdateInsights([...filtered, { date: today, data: generated }]);
+        }
         localStorage.setItem(usageKey, (count + 1).toString());
       }
     } catch (e: any) {
@@ -201,10 +211,11 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
   }, []);
 
   useEffect(() => {
-    if (view === 'insights' && insights.length === 0 && !usageError && !isGenerating) {
+    // Auto-fetch if no insights for today exist yet and we open the view
+    if (view === 'insights' && todayInsights.length === 0 && !usageError && !isGenerating) {
       fetchInsights();
     }
-  }, [view]);
+  }, [view, todayInsights.length]);
 
   const getColorClasses = (colorStr: string) => {
     const c = colorStr?.toLowerCase() || '';
@@ -503,7 +514,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition-all shadow-md group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-500 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180'}`}><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.6 5.6"/></svg>
-              Refresh
+              Refresh Insights
             </button>
           </div>
 
@@ -520,7 +531,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
                 <div key={i} className="bg-slate-800/40 border border-slate-700/50 p-6 rounded-3xl h-[120px] animate-pulse"></div>
               ))
             ) : (
-              insights.map((insight, index) => (
+              todayInsights.map((insight, index) => (
                 <div
                   key={insight.title + index}
                   className={`bg-slate-800/60 border border-slate-700 p-6 rounded-3xl shadow-lg flex gap-5 items-start animate-in fade-in slide-in-from-left-8 hover:border-indigo-500/40 transition-colors group relative overflow-hidden`}

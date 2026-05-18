@@ -43,6 +43,7 @@ export interface PlannerState {
   dailyMission?: string;
   chatHistory: Record<string, ChatMessage[]>;
   notes?: Note[];
+  aiInsights?: { date: string, data: any[] }[];
 }
 
 export interface ChatMessage {
