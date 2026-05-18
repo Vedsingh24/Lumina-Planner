@@ -262,11 +262,13 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
 
   return (
     <div
-      onMouseDown={(e) => beginDrag(e, 'move')}
+      onMouseDown={(e) => task.id !== 'ghost-preview' ? beginDrag(e, 'move') : undefined}
       className={`absolute top-8 bottom-3 rounded-xl border-2 flex items-stretch overflow-hidden group/tb select-none transition-all duration-150 ${isDragging && dragType === 'move'
           ? `opacity-30 border-dashed pointer-events-none z-auto ${s.bg} ${s.border} ${s.text}`
-          : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
-        } ${isCompleted && !justCompleted ? 'opacity-80 border-emerald-500/50 shadow-emerald-900/30 task-pulse' : ''} ${justCompleted ? 'border-emerald-400 overflow-hidden shadow-emerald-500/40 shadow-xl z-30' : ''}`}
+          : task.id === 'ghost-preview'
+            ? `opacity-60 pointer-events-none z-0 ${s.bg} ${s.border} ${s.text}`
+            : `${s.bg} ${s.border} ${s.text} ${s.shadow} ${isDragging ? 'shadow-xl shadow-black/40 z-50 scale-[1.02] ring-1 ring-white/10' : 'z-10 hover:z-20 hover:scale-[1.01]'}`
+        } ${isCompleted && !justCompleted ? 'border-emerald-500/50 shadow-emerald-900/30 bg-emerald-500 text-white task-pulse' : ''} ${justCompleted ? 'border-emerald-400 overflow-hidden shadow-emerald-500/40 shadow-xl z-30' : ''}`}
       style={{
         left: vLeft,
         width: Math.max(SNAP_MINS * PPM, vWidth),
@@ -310,7 +312,13 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
               </div>
             </>
           ) : (
-            <div className="animate-premium-shimmer z-0" />
+            <>
+              {/* Solid Background with Shimmering White Gradient */}
+              <div className="absolute inset-0 bg-emerald-500 z-0" />
+              <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                <div className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+              </div>
+            </>
           )}
         </>
       )}
@@ -332,6 +340,7 @@ const TaskBlock: React.FC<TaskBlockProps> = ({
 // ── Track (one horizontal row) ───────────────────────────────────────────────
 interface TrackProps {
   name: string;
+  date: string;
   trackTasks: Task[];
   isActiveDay: boolean;
   scrollRef: React.RefObject<HTMLDivElement>;
@@ -345,9 +354,10 @@ interface TrackProps {
 
 const Track: React.FC<TrackProps> = (props) => {
   const trackRef = useRef<HTMLDivElement>(null);
-  const { name, trackTasks, isActiveDay, scrollRef, ...handlers } = props;
+  const { name, trackTasks, isActiveDay, scrollRef, date, ...handlers } = props;
   return (
     <div
+      id={`track-${date}`}
       ref={trackRef}
       className={`relative w-full border-b border-white/5 flex flex-1 min-h-[80px] ${isActiveDay ? 'bg-slate-900/30' : 'opacity-40 hover:opacity-55 transition-opacity'}`}
     >
@@ -377,6 +387,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
   const [anyDragging, setAnyDragging] = useState(false);
   const [isOverTrash, setIsOverTrash] = useState(false);
   const [sidebarDragId, setSidebarDragId] = useState<string | null>(null);
+  const [dropPreview, setDropPreview] = useState<{ date: string, mins: number } | null>(null);
   const [dayOffset, setDayOffset] = useState(0);
   const ghostRef = useRef<HTMLElement | null>(null);
 
@@ -460,6 +471,30 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
         const leftD = ev.clientX - br.left;
         if (rightD > 0 && rightD < SCROLL_ZONE) scrollRef.current.scrollLeft += Math.ceil((SCROLL_ZONE - rightD) / 5);
         if (leftD > 0 && leftD < SCROLL_ZONE) scrollRef.current.scrollLeft -= Math.ceil((SCROLL_ZONE - leftD) / 5);
+
+        // Find track being hovered for drop preview
+        if (ev.clientX >= br.left && ev.clientX <= br.right && ev.clientY >= br.top && ev.clientY <= br.bottom) {
+          const dropX = ev.clientX - br.left + scrollRef.current.scrollLeft - 16;
+          const dropM = snap(Math.max(0, dropX / PPM));
+          let foundDate = null;
+          // In a multi-track layout, find which track element the cursor is over
+          // Since daysInfo holds the dates, we check track DOM nodes by id
+          for (let i = -2; i <= 2; i++) {
+            const dateStr = getAdjacentDate(selectedDate, dayOffset + i);
+            const el = document.getElementById(`track-${dateStr}`);
+            if (el) {
+              const r = el.getBoundingClientRect();
+              if (ev.clientY >= r.top && ev.clientY <= r.bottom) {
+                foundDate = dateStr;
+                break;
+              }
+            }
+          }
+          // Fallback to selectedDate if couldn't accurately find track
+          setDropPreview({ date: foundDate || selectedDate, mins: dropM });
+        } else {
+          setDropPreview(null);
+        }
       }
     };
 
@@ -468,6 +503,7 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
       window.removeEventListener('mouseup', onMu);
       if (ghostRef.current) { document.body.removeChild(ghostRef.current); ghostRef.current = null; }
       setSidebarDragId(null);
+      setDropPreview(null);
       setAnyDragging(false);
       setIsOverTrash(false);
 
@@ -581,15 +617,31 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
 
             {/* Tracks */}
             <div className="relative z-10 pt-5 space-y-0.5 flex flex-col flex-1 h-full">
-              {daysInfo.map((info) => (
-                <Track
-                  key={info.date}
-                  name={info.name}
-                  trackTasks={scheduled(info.date)}
-                  isActiveDay={info.isActive}
-                  {...commonTrackProps}
-                />
-              ))}
+              {daysInfo.map((info) => {
+                const trackTasks = [...scheduled(info.date)];
+                if (dropPreview && dropPreview.date === info.date && sidebarDragId) {
+                  const draggedTask = tasks.find(t => t.id === sidebarDragId);
+                  if (draggedTask) {
+                    trackTasks.push({
+                      ...draggedTask,
+                      id: 'ghost-preview',
+                      startTime: toTime(dropPreview.mins),
+                      endTime: toTime(Math.min(TOTAL_MINS, dropPreview.mins + 60))
+                    } as any);
+                  }
+                }
+
+                return (
+                  <Track
+                    key={info.date}
+                    date={info.date}
+                    name={info.name}
+                    trackTasks={trackTasks}
+                    isActiveDay={info.isActive}
+                    {...commonTrackProps}
+                  />
+                );
+              })}
             </div>
 
           </div>
@@ -670,6 +722,14 @@ const ScheduleBoard: React.FC<ScheduleBoardProps> = ({ tasks: rawTasks, selected
         }
         .animate-task-done-text {
           animation: task-done-text 2.5s ease-out forwards;
+        }
+
+        @keyframes shimmer-sweep {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(50%); }
+        }
+        .animate-shimmer {
+          animation: shimmer-sweep 3s infinite ease-in-out;
         }
 
         @keyframes task-pulse-ring {

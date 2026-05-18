@@ -76,5 +76,42 @@ export const geminiService = {
       }
       return { reply: errorMsg, tasks: [] };
     }
+  },
+
+  // Generate dynamic insights based on computed stats
+  generateInsights: async (stats: any): Promise<any[]> => {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `You are an expert productivity analyst. Review the user's task statistics and generate 4 highly specific, actionable insights.
+
+Stats:
+${JSON.stringify(stats)}
+
+Rules:
+1. Provide a mix of encouraging successes, mild warnings (if they are struggling or overloaded), and strategic tips.
+2. The 'icon' field MUST be EXACTLY ONE of the following: "clipboard", "check", "star", "lightning", "target", "flame". Do not use emojis.
+3. Keep titles short and punchy. Keep reasons under 2 sentences.
+4. Output strict JSON only.
+
+Schema:
+{ "insights": [ { "title": "string", "reason": "string", "icon": "string", "color": "string (tailwind text/border/bg classes)" } ] }`,
+        config: {
+          temperature: 0.7,
+          responseMimeType: "application/json"
+        }
+      });
+
+      let text = (response && response.text) ? response.text.trim() : '{}';
+      if (text.startsWith('```')) {
+        text = text.replace(/^```json\n?/, '').replace(/^```\n?/, '');
+        text = text.replace(/\n?```$/, '');
+      }
+      const parsed = JSON.parse(text.trim());
+      return parsed.insights || [];
+    } catch (e: any) {
+      console.error('generateInsights error:', e);
+      throw new Error("I couldn't generate insights right now due to an API limit or connection issue. Please try again later.");
+    }
   }
 };

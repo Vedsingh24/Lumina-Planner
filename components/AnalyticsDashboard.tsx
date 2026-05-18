@@ -1,5 +1,6 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { geminiService } from '../services/geminiService';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
@@ -162,59 +163,69 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
   }, [tasks]);
 
   const [view, setView] = useState<'stats' | 'insights'>('stats');
-  const [insightSeed, setInsightSeed] = useState(0);
+  const [insights, setInsights] = useState<any[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
-  const insights = useMemo(() => {
-    const list: { icon: string, color: string, title: string, reason: string }[] = [];
-    
-    // Performance
-    if (stats.rate < 50 && stats.total > 10) {
-      list.push({ icon: '⚠️', color: 'text-amber-500 border-amber-500/30 bg-amber-500/10', title: 'Consider Reducing Workload', reason: `Your completion rate is currently ${stats.rate}%. Trying taking on fewer tasks to build momentum.` });
-    } else if (stats.rate > 80 && stats.total > 10) {
-      list.push({ icon: '🔥', color: 'text-orange-500 border-orange-500/30 bg-orange-500/10', title: 'Peak Efficiency', reason: `Excellent completion rate of ${stats.rate}%. You are operating at a very high level right now.` });
+  const fetchInsights = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const usageKey = `lumina_insights_usage_${today}`;
+    const count = parseInt(localStorage.getItem(usageKey) || '0', 10);
+
+    if (count >= 2) {
+      setUsageError("You have reached your daily limit of 2 AI Insight generations. Please try again tomorrow.");
+      return;
     }
 
-    // Priorities
-    const highP = stats.priorityData.find(p => p.name === 'High');
-    const medP = stats.priorityData.find(p => p.name === 'Medium');
-    if (highP && medP && highP.count > 0 && medP.count > 0 && highP.rate < medP.rate) {
-      list.push({ icon: '🎯', color: 'text-red-500 border-red-500/30 bg-red-500/10', title: 'Prioritize High-Impact Tasks', reason: `Your completion rate for High priority tasks (${highP.rate}%) is lower than Medium priority (${medP.rate}%). Try tackling the hardest things first.` });
-    }
-
-    // Categories
-    const dom = [...stats.categoryData].sort((a, b) => b.value - a.value)[0];
-    if (dom && dom.value / stats.total > 0.4) {
-      list.push({ icon: '📊', color: 'text-blue-500 border-blue-500/30 bg-blue-500/10', title: `Strong Focus on ${dom.name}`, reason: `Over 40% of your tasks fall under the ${dom.name} category. Make sure this aligns with your long-term goals.` });
-    }
-
-    const unrated = stats.categoryData.find(c => parseFloat(c.avgRating as string) === 0 && c.value > 0);
-    if (unrated) {
-      list.push({ icon: '⭐', color: 'text-violet-500 border-violet-500/30 bg-violet-500/10', title: `Rate Your ${unrated.name} Tasks`, reason: `You haven't been rating your ${unrated.name} tasks. Adding a rating helps track how these activities make you feel.` });
-    }
-
-    // Trend
-    if (stats.completionTrend.length >= 2) {
-      const recent = stats.completionTrend.slice(-3);
-      if (recent.every((d, i) => i === 0 || d.efficiency <= recent[i - 1].efficiency) && recent[0].efficiency > recent[recent.length-1].efficiency) {
-        list.push({ icon: '📉', color: 'text-slate-400 border-slate-500/30 bg-slate-500/10', title: 'Productivity Dip', reason: `Your daily efficiency has trended downward recently. It might be time for a rest day.` });
-      } else if (recent.every((d, i) => i === 0 || d.efficiency >= recent[i - 1].efficiency) && recent[0].efficiency < recent[recent.length-1].efficiency) {
-        list.push({ icon: '📈', color: 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10', title: 'Momentum Building', reason: `Your daily efficiency is trending upwards over the last few days. Keep it up!` });
+    setIsGenerating(true);
+    setUsageError(null);
+    try {
+      const generated = await geminiService.generateInsights(stats);
+      if (generated && generated.length > 0) {
+        setInsights(generated);
+        localStorage.setItem(usageKey, (count + 1).toString());
       }
+    } catch (e: any) {
+      console.error(e);
+      setUsageError(e.message || "I couldn't generate insights right now due to an API limit or connection issue.");
+    } finally {
+      setIsGenerating(false);
     }
+  };
 
-    // Fallbacks if not enough insights
-    if (list.length < 3) {
-      list.push({ icon: '💡', color: 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10', title: 'Consistency is Key', reason: `You've assigned ${stats.total} tasks so far. Small daily steps lead to massive results.` });
+  // RESET LIMIT FOR TODAY
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const usageKey = `lumina_insights_usage_${today}`;
+    localStorage.removeItem(usageKey);
+  }, []);
+
+  useEffect(() => {
+    if (view === 'insights' && insights.length === 0 && !usageError && !isGenerating) {
+      fetchInsights();
     }
+  }, [view]);
 
-    // Pseudo-random shuffle based on seed
-    for (let i = list.length - 1; i > 0; i--) {
-      const j = (i + insightSeed * 7) % (i + 1);
-      [list[i], list[j]] = [list[j], list[i]];
-    }
+  const getColorClasses = (colorStr: string) => {
+    const c = colorStr?.toLowerCase() || '';
+    if (c.includes('red') || c.includes('rose')) return 'text-red-500 border-red-500/30 bg-red-500/10';
+    if (c.includes('orange') || c.includes('amber')) return 'text-amber-500 border-amber-500/30 bg-amber-500/10';
+    if (c.includes('emerald') || c.includes('green')) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
+    if (c.includes('cyan') || c.includes('teal')) return 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10';
+    if (c.includes('blue')) return 'text-blue-500 border-blue-500/30 bg-blue-500/10';
+    if (c.includes('violet') || c.includes('purple')) return 'text-violet-500 border-violet-500/30 bg-violet-500/10';
+    if (c.includes('pink')) return 'text-pink-500 border-pink-500/30 bg-pink-500/10';
+    return 'text-indigo-400 border-indigo-500/30 bg-indigo-500/10';
+  };
 
-    return list.slice(0, 4);
-  }, [stats, insightSeed]);
+  const IconMap: Record<string, React.ReactNode> = {
+    clipboard: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>,
+    check: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
+    star: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>,
+    lightning: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
+    target: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>,
+    flame: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>,
+  };
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899'];
 
@@ -243,7 +254,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
             onClick={() => setView('insights')}
             className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${view === 'insights' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-500/50' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
             AI Insights
           </button>
         </div>
@@ -476,40 +489,55 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ tasks }) => {
             <div>
               <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
                 <span className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line>
+                  </svg>
                 </span>
                 Automated Insights
               </h3>
-              <p className="text-slate-400 text-sm mt-2">Personalized feedback based on your recent activity.</p>
+              <p className="text-slate-400 text-sm mt-2">Personalized AI feedback based on your recent activity.</p>
             </div>
             <button
-              onClick={() => setInsightSeed(s => s + 1)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition-all shadow-md group"
+              onClick={fetchInsights}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-sm transition-all shadow-md group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-180 transition-transform duration-500"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.6 5.6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-500 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180'}`}><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.6 5.6"/></svg>
               Refresh
             </button>
           </div>
 
+          {usageError && (
+            <div className="mb-6 bg-slate-800 border border-indigo-500/30 text-indigo-300 p-4 rounded-2xl flex items-center gap-4 text-sm font-medium shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-indigo-400"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              {usageError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {insights.map((insight, index) => (
-              <div
-                key={insight.title + insightSeed}
-                className={`bg-slate-800/60 border border-slate-700 p-6 rounded-3xl shadow-lg flex gap-5 items-start animate-in fade-in slide-in-from-left-8 hover:border-indigo-500/40 transition-colors group relative overflow-hidden`}
-                style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
-              >
-                {/* Background glow */}
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-colors"></div>
-                
-                <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center text-3xl border shadow-inner ${insight.color}`}>
-                  {insight.icon}
+            {isGenerating ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-slate-800/40 border border-slate-700/50 p-6 rounded-3xl h-[120px] animate-pulse"></div>
+              ))
+            ) : (
+              insights.map((insight, index) => (
+                <div
+                  key={insight.title + index}
+                  className={`bg-slate-800/60 border border-slate-700 p-6 rounded-3xl shadow-lg flex gap-5 items-start animate-in fade-in slide-in-from-left-8 hover:border-indigo-500/40 transition-colors group relative overflow-hidden`}
+                  style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
+                >
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-colors"></div>
+                  
+                  <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center text-3xl border shadow-inner ${getColorClasses(insight.color)}`}>
+                    {IconMap[insight.icon] || IconMap['star']}
+                  </div>
+                  <div className="flex-1 min-w-0 z-10">
+                    <h4 className="text-lg font-bold text-slate-100 mb-2">{insight.title}</h4>
+                    <p className="text-sm text-slate-400 leading-relaxed">{insight.reason}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0 z-10">
-                  <h4 className="text-lg font-bold text-slate-100 mb-2">{insight.title}</h4>
-                  <p className="text-sm text-slate-400 leading-relaxed">{insight.reason}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}
